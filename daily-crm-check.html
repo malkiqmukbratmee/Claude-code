@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Daily CRM Check</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161a22;
+    --panel-2: #1d222c;
+    --border: #2a2f3a;
+    --text: #e6e8ee;
+    --muted: #8a93a6;
+    --accent: #6aa6ff;
+    --good: #4ade80;
+    --warn: #fbbf24;
+    --bad: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  header {
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  h1 { margin: 0; font-size: 22px; font-weight: 600; }
+  .date { color: var(--muted); font-variant-numeric: tabular-nums; }
+  main {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px 32px 64px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 720px) { main { grid-template-columns: 1fr; padding: 16px; } }
+  section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  section.full { grid-column: 1 / -1; }
+  h2 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  ul.checklist { list-style: none; padding: 0; margin: 0; }
+  ul.checklist li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+  }
+  ul.checklist li:hover { background: var(--panel-2); }
+  ul.checklist input[type="checkbox"] {
+    width: 16px; height: 16px; accent-color: var(--accent);
+  }
+  ul.checklist label { cursor: pointer; flex: 1; }
+  ul.checklist input:checked + label {
+    text-decoration: line-through;
+    color: var(--muted);
+  }
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+  }
+  .metric {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .metric .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .metric input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 20px;
+    font-weight: 600;
+    padding: 4px 0 0;
+    outline: none;
+  }
+  textarea {
+    width: 100%;
+    min-height: 100px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font: inherit;
+    resize: vertical;
+    outline: none;
+  }
+  textarea:focus, .metric input:focus { border-color: var(--accent); }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 24px;
+  }
+  button.reset {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font: inherit;
+  }
+  button.reset:hover { color: var(--text); border-color: var(--accent); }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Daily CRM Check</h1>
+      <div class="row" style="margin-top:6px">
+        <span class="pill">Owner: you</span>
+        <span class="pill">Cadence: daily</span>
+        <span class="pill">Target: 30 min</span>
+      </div>
+    </div>
+    <div class="date" id="today"></div>
+  </header>
+
+  <main>
+    <section>
+      <h2>Pipeline Hygiene</h2>
+      <ul class="checklist">
+        <li><input type="checkbox" id="c1"/><label for="c1">Review new leads from last 24h</label></li>
+        <li><input type="checkbox" id="c2"/><label for="c2">Assign owners to unassigned deals</label></li>
+        <li><input type="checkbox" id="c3"/><label for="c3">Update stages for deals that moved</label></li>
+        <li><input type="checkbox" id="c4"/><label for="c4">Clear stale tasks (older than 7 days)</label></li>
+        <li><input type="checkbox" id="c5"/><label for="c5">Check deals with no activity &gt; 14 days</label></li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Follow-ups Due Today</h2>
+      <ul class="checklist">
+        <li><input type="checkbox" id="f1"/><label for="f1">Reply to inbound emails (inbox zero)</label></li>
+        <li><input type="checkbox" id="f2"/><label for="f2">Send scheduled follow-ups</label></li>
+        <li><input type="checkbox" id="f3"/><label for="f3">Confirm tomorrow's meetings</label></li>
+        <li><input type="checkbox" id="f4"/><label for="f4">Log calls/notes from yesterday</label></li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Numbers</h2>
+      <div class="metrics">
+        <div class="metric"><div class="label">New leads</div><input type="number" min="0" placeholder="0"/></div>
+        <div class="metric"><div class="label">Calls made</div><input type="number" min="0" placeholder="0"/></div>
+        <div class="metric"><div class="label">Demos booked</div><input type="number" min="0" placeholder="0"/></div>
+        <div class="metric"><div class="label">Deals closed</div><input type="number" min="0" placeholder="0"/></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Top 3 Deals to Move</h2>
+      <textarea placeholder="1. Acme Co — push to proposal&#10;2. ...&#10;3. ..."></textarea>
+    </section>
+
+    <section class="full">
+      <h2>Blockers & Notes</h2>
+      <textarea placeholder="What's stuck? What needs a decision? What did you learn from a customer today?"></textarea>
+    </section>
+
+    <section class="full" style="display:flex; justify-content: space-between; align-items:center;">
+      <span class="pill" id="progress">0 / 9 checked</span>
+      <button class="reset" onclick="resetAll()">Reset for tomorrow</button>
+    </section>
+  </main>
+
+  <footer>Saved locally in your browser — refresh keeps state.</footer>
+
+  <script>
+    const today = new Date('2026-05-23T00:00:00');
+    document.getElementById('today').textContent = today.toLocaleDateString(undefined, {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+
+    const KEY = 'daily-crm-check-2026-05-23';
+    const state = JSON.parse(localStorage.getItem(KEY) || '{}');
+
+    function save() {
+      const next = {};
+      document.querySelectorAll('input, textarea').forEach(el => {
+        const id = el.id || el.placeholder;
+        next[id] = el.type === 'checkbox' ? el.checked : el.value;
+      });
+      localStorage.setItem(KEY, JSON.stringify(next));
+      const total = document.querySelectorAll('input[type=checkbox]').length;
+      const done = document.querySelectorAll('input[type=checkbox]:checked').length;
+      document.getElementById('progress').textContent = `${done} / ${total} checked`;
+    }
+
+    document.querySelectorAll('input, textarea').forEach(el => {
+      const id = el.id || el.placeholder;
+      if (state[id] !== undefined) {
+        if (el.type === 'checkbox') el.checked = state[id];
+        else el.value = state[id];
+      }
+      el.addEventListener('input', save);
+      el.addEventListener('change', save);
+    });
+    save();
+
+    function resetAll() {
+      if (!confirm('Clear all fields?')) return;
+      localStorage.removeItem(KEY);
+      document.querySelectorAll('input, textarea').forEach(el => {
+        if (el.type === 'checkbox') el.checked = false;
+        else el.value = '';
+      });
+      save();
+    }
+  </script>
+</body>
+</html>
