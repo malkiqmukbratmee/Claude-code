@@ -329,29 +329,25 @@ def _summary_html_table(summary):
 
 
 def _make_instrument_figure(name, result):
+    """4 panes per instrument: candles, Val 1M, Val 4M, Seasonality."""
     ohlc = synthesize_monthly_ohlc(result["price"])
-    cot = result["cot"]
     val_1m = result["val_1m"]
     val_4m = result["val_4m"]
     seas_avg = result["seasonal_avg"]
     seas_cur = result["seasonal_cur"]
-    events = result["events"]
 
     fig = make_subplots(
-        rows=5, cols=1, shared_xaxes=False,
-        row_heights=[0.32, 0.20, 0.14, 0.14, 0.20],
-        vertical_spacing=0.045,
+        rows=4, cols=1, shared_xaxes=False,
+        row_heights=[0.36, 0.21, 0.21, 0.22],
+        vertical_spacing=0.075,
         subplot_titles=(
-            f"{name} — monthly candles + confluence markers",
-            f"COT Index (BG positioning, {LOOKBACK_QUARTERS}Q lookback) — "
-            "Commercials / Non-com / Retailers",
+            f"{name} — monthly candles",
             "Valuation 1M (vs EUR/USD + EURIBOR12M, 1-mo / 12-mo rescale)",
             "Valuation 4M (vs EUR/USD + EURIBOR12M, 4-mo / 12-mo rescale)",
             f"Seasonality — avg last {SEASONALITY_YEARS} yrs vs current year",
         ),
     )
 
-    # --- 1) Candles + markers ---
     fig.add_trace(go.Candlestick(
         x=ohlc.index, open=ohlc["open"], high=ohlc["high"],
         low=ohlc["low"], close=ohlc["close"],
@@ -359,114 +355,64 @@ def _make_instrument_figure(name, result):
         decreasing_line_color=RED,   decreasing_fillcolor=RED,
         name=name, showlegend=False,
     ), row=1, col=1)
-    buys  = events[events["direction"] == "BUY"]
-    sells = events[events["direction"] == "SELL"]
-    if len(buys):
-        y = [float(ohlc.loc[d, "low"]) * 0.96 for d in buys["date"]]
-        fig.add_trace(go.Scatter(
-            x=list(buys["date"]), y=y, mode="markers",
-            marker=dict(symbol="triangle-up", size=13, color=GREEN,
-                        line=dict(color="#222", width=1)),
-            name="BUY conf",
-            hovertemplate="BUY %{x|%Y-%m}<extra></extra>",
-        ), row=1, col=1)
-    if len(sells):
-        y = [float(ohlc.loc[d, "high"]) * 1.04 for d in sells["date"]]
-        fig.add_trace(go.Scatter(
-            x=list(sells["date"]), y=y, mode="markers",
-            marker=dict(symbol="triangle-down", size=13, color=RED,
-                        line=dict(color="#222", width=1)),
-            name="SELL conf",
-            hovertemplate="SELL %{x|%Y-%m}<extra></extra>",
-        ), row=1, col=1)
+    fig.update_xaxes(rangeslider_visible=False, row=1, col=1)
 
-    # --- 2) COT (3 legs combined) ---
-    for label, col, color in [
-        ("Commercials",      "commercials",    GREEN),
-        ("Non-commercials",  "noncommercials", YELLOW),
-        ("Retailers",        "retailers",      RED),
-    ]:
-        s = cot[col].dropna()
-        fig.add_trace(go.Scatter(
-            x=s.index, y=s.values, mode="lines", name=label,
-            line=dict(color=color, width=1.4),
-            hovertemplate=label + ": %{y:.0f}<extra></extra>",
-            showlegend=(name == "EU Property ETF (IPRP-like)"),
-            legendgroup="cot", legendgrouptitle_text="COT legs",
-        ), row=2, col=1)
-    fig.add_hline(y=UPPER_THRESHOLD, line=dict(color="#888", width=1, dash="dash"), row=2, col=1)
-    fig.add_hline(y=LOWER_THRESHOLD, line=dict(color="#888", width=1, dash="dash"), row=2, col=1)
-    fig.add_hrect(y0=UPPER_THRESHOLD, y1=100, fillcolor=RED, opacity=0.05,
-                  line_width=0, row=2, col=1)
-    fig.add_hrect(y0=0, y1=LOWER_THRESHOLD, fillcolor=GREEN, opacity=0.05,
-                  line_width=0, row=2, col=1)
-    fig.update_yaxes(range=[-5, 105], row=2, col=1)
-
-    # --- 3) Val 1M ---
     s = val_1m.dropna()
     fig.add_trace(go.Scatter(
         x=s.index, y=s.values, mode="lines", showlegend=False,
         line=dict(color="#a040ff", width=1.5),
         hovertemplate="Val 1M: %{y:.1f}<extra></extra>",
+    ), row=2, col=1)
+    fig.add_hline(y=VAL_UPPER, line=dict(color=RED,   width=1, dash="dash"), row=2, col=1)
+    fig.add_hline(y=VAL_LOWER, line=dict(color=GREEN, width=1, dash="dash"), row=2, col=1)
+    fig.add_hline(y=0, line=dict(color="#888", width=0.7), row=2, col=1)
+    fig.update_yaxes(range=[-110, 110], row=2, col=1)
+
+    s = val_4m.dropna()
+    fig.add_trace(go.Scatter(
+        x=s.index, y=s.values, mode="lines", showlegend=False,
+        line=dict(color=BLUE, width=1.5),
+        hovertemplate="Val 4M: %{y:.1f}<extra></extra>",
     ), row=3, col=1)
     fig.add_hline(y=VAL_UPPER, line=dict(color=RED,   width=1, dash="dash"), row=3, col=1)
     fig.add_hline(y=VAL_LOWER, line=dict(color=GREEN, width=1, dash="dash"), row=3, col=1)
     fig.add_hline(y=0, line=dict(color="#888", width=0.7), row=3, col=1)
     fig.update_yaxes(range=[-110, 110], row=3, col=1)
 
-    # --- 4) Val 4M ---
-    s = val_4m.dropna()
-    fig.add_trace(go.Scatter(
-        x=s.index, y=s.values, mode="lines", showlegend=False,
-        line=dict(color=BLUE, width=1.5),
-        hovertemplate="Val 4M: %{y:.1f}<extra></extra>",
-    ), row=4, col=1)
-    fig.add_hline(y=VAL_UPPER, line=dict(color=RED,   width=1, dash="dash"), row=4, col=1)
-    fig.add_hline(y=VAL_LOWER, line=dict(color=GREEN, width=1, dash="dash"), row=4, col=1)
-    fig.add_hline(y=0, line=dict(color="#888", width=0.7), row=4, col=1)
-    fig.update_yaxes(range=[-110, 110], row=4, col=1)
-
-    # --- 5) Seasonality ---
     if len(seas_avg):
         fig.add_trace(go.Scatter(
             x=seas_avg.index, y=seas_avg.values, mode="lines+markers",
             name=f"Avg last {SEASONALITY_YEARS} yrs",
             line=dict(color="#a040ff", width=2),
             hovertemplate="M%{x}: %{y:+.1f}%<extra></extra>",
-            showlegend=(name == "EU Property ETF (IPRP-like)"),
-            legendgroup="seas", legendgrouptitle_text="Seasonality",
-        ), row=5, col=1)
+            showlegend=False,
+        ), row=4, col=1)
     if len(seas_cur):
         fig.add_trace(go.Scatter(
             x=seas_cur.index, y=seas_cur.values, mode="lines+markers",
             name="Current year",
             line=dict(color=BLUE, width=2, dash="dot"),
             hovertemplate="M%{x}: %{y:+.1f}%<extra></extra>",
-            showlegend=(name == "EU Property ETF (IPRP-like)"),
-            legendgroup="seas",
-        ), row=5, col=1)
+            showlegend=False,
+        ), row=4, col=1)
     fig.update_xaxes(
         tickmode="array",
         tickvals=list(range(1, 13)),
         ticktext=["Jan","Feb","Mar","Apr","May","Jun",
                   "Jul","Aug","Sep","Oct","Nov","Dec"],
-        row=5, col=1,
+        row=4, col=1,
     )
 
-    fig.update_xaxes(rangeslider_visible=False, row=1, col=1)
     fig.update_yaxes(title_text="Price", row=1, col=1)
-    fig.update_yaxes(title_text="COT", row=2, col=1)
-    fig.update_yaxes(title_text="Val 1M", row=3, col=1)
-    fig.update_yaxes(title_text="Val 4M", row=4, col=1)
-    fig.update_yaxes(title_text="% from Jan", row=5, col=1)
-    fig.update_xaxes(title_text="Month", row=5, col=1)
+    fig.update_yaxes(title_text="Val 1M", row=2, col=1)
+    fig.update_yaxes(title_text="Val 4M", row=3, col=1)
+    fig.update_yaxes(title_text="% from Jan", row=4, col=1)
+    fig.update_xaxes(title_text="Month", row=4, col=1)
 
     fig.update_layout(
-        template="plotly_white", height=1180,
+        template="plotly_white", height=1080,
         margin=dict(l=55, r=30, t=80, b=40),
-        hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.005,
-                    xanchor="left", x=0),
+        hovermode="closest",
     )
     return fig
 
@@ -477,60 +423,24 @@ def build_html_report(results, macros, monthly_price_bg, out_path, source_label)
         fig = _make_instrument_figure(r["name"], r)
         chart_div = fig.to_html(include_plotlyjs=False, full_html=False,
                                 div_id=f"chart_{abs(hash(r['name']))}")
-
-        sections.append(f"""
-<section class='instrument'>
-  <h2>{r['name']}</h2>
-  {chart_div}
-  <div class='tables'>
-    <div class='col'>
-      <h3>Confluence events</h3>
-      {_events_html_table(r['events'])}
-    </div>
-    <div class='col'>
-      <h3>Summary (forward returns by direction)</h3>
-      {_summary_html_table(r['summary'])}
-    </div>
-  </div>
-</section>
-""")
+        sections.append(f"<section class='instrument'>{chart_div}</section>")
 
     html = f"""<!doctype html>
 <html><head><meta charset='utf-8'>
-<title>BG Housing — Confluence Test on Tradables</title>
+<title>Tradables — Valuation + Seasonality</title>
 <script src='https://cdn.plot.ly/plotly-latest.min.js'></script>
 <style>
   body {{ font-family: -apple-system, system-ui, sans-serif; margin: 24px;
          background:#fafafa; color:#222; }}
   h1 {{ margin-bottom: 4px; }}
   .src {{ color:#666; font-size:13px; margin-bottom: 22px; }}
-  .legend {{ background:#fff; border:1px solid #ddd; padding:12px 16px;
-             border-radius:8px; margin-bottom:22px; font-size:13px; line-height:1.5; }}
-  section.instrument {{ background:#fff; border:1px solid #ddd; border-radius:8px;
-                        padding:14px 18px; margin-bottom:22px; }}
-  .tables {{ display:flex; gap:24px; flex-wrap:wrap; }}
-  .col {{ flex:1; min-width:340px; }}
-  table {{ border-collapse:collapse; width:100%; font-size:12px; }}
-  th, td {{ padding:4px 8px; border-bottom:1px solid #eee; text-align:right; }}
-  th {{ background:#f4f4f4; text-align:right; }}
-  td:first-child, th:first-child {{ text-align:left; }}
-  .buy  {{ color:{GREEN}; font-weight:600; }}
-  .sell {{ color:{RED};   font-weight:600; }}
-  .pos  {{ color:{GREEN}; }}
-  .neg  {{ color:{RED};   }}
-  .base {{ font-size:12px; color:#666; margin-top:6px; }}
+  section.instrument {{ background:#fff; border:1px solid #ddd;
+                        border-radius:8px; padding:14px 18px;
+                        margin-bottom:22px; }}
 </style></head>
 <body>
-  <h1>BG Housing — Confluence Test on Tradables</h1>
+  <h1>Tradables — Valuation + Seasonality</h1>
   <div class='src'>data: {source_label}</div>
-  <div class='legend'>
-    <strong>Method:</strong> three indicators flag extremes independently —
-    <strong>COT</strong> (any leg ≤{LOWER_THRESHOLD} buy / ≥{UPPER_THRESHOLD} sell),
-    <strong>Valuation 4M</strong> (≤{VAL_LOWER} buy / ≥{VAL_UPPER} sell),
-    <strong>Seasonality</strong> (current-yr path ±{SEASONAL_DEV_THRESHOLD}% vs avg).
-    A <em>confluence</em> is when ≥ 2 votes line up in the same direction in
-    the same month. Forward returns measured from the first month of each streak.
-  </div>
   {''.join(sections)}
 </body></html>"""
     with open(out_path, "w") as f:
