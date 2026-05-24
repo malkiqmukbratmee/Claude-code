@@ -95,49 +95,109 @@ def fetch_live_data():
 
 # ---------- Synthetic demo data ----------
 
+def _anchored_series(months, anchors, noise_std=0.0, seed=0):
+    """
+    Build a monthly series by linearly interpolating between known anchor
+    points (month_index → value), then layering optional cumulative noise.
+    """
+    idx = np.array(sorted(anchors.keys()))
+    vals = np.array([anchors[k] for k in idx])
+    tm = np.arange(len(months))
+    out = np.interp(tm, idx, vals)
+    if noise_std > 0:
+        rng = np.random.default_rng(seed)
+        out = out + rng.normal(0, noise_std, len(months)).cumsum() * 0.05
+    return out
+
+
 def synthetic_demo_data():
     """
-    Calibrated to published BG stats:
-      Sofia avg price 2025 ≈ 3,500 BGN/m²
-      Permits Q4 2025 ≈ 15,642 dwellings
-      Mortgage stock Feb 2026 ≈ EUR 17.3bn, +27.8% YoY
+    Calibrated to published BG stats, anchors covering 2007-2026:
+
+      Avg price (BGN/m², Sofia):  2007 peak ~2,200  → 2010 bottom ~1,300
+                                  → 2015 ~1,500    → 2025 ~3,800
+      Permits (dwellings/quarter): 2007 ~9,000     → 2010 ~1,500
+                                   → 2015 ~2,500   → 2025 ~5,500
+      Mortgage stock (EUR bn):    2008 peak ~3.5   → 2013 ~3.0
+                                  → 2015 ~3.5     → 2026 Feb ~17.3
+      NFC RE loan stock (EUR bn): 2009 peak ~2.1   → 2014 ~1.6
+                                  → 2015 ~1.5     → 2025 ~2.3
     """
-    rng = np.random.default_rng(7)
+    months = pd.date_range(start="2007-01-01", end="2026-04-01", freq="MS")
+    # month indexes used as anchors (Jan 2007 = 0)
+    def mi(year, month):
+        return (year - 2007) * 12 + (month - 1)
 
-    # ----- monthly avg_price (BGN/m²) -----
-    months = pd.date_range(start="2015-01-01", end="2026-04-01", freq="MS")
-    m = len(months)
-    tm = np.arange(m)
-    excess = np.maximum(tm - 60, 0).astype(float)  # boom starts ~2020
-    avg_price = np.where(tm < 60, 1500 + tm * 6.0, 1860 + (excess ** 1.45) * 4.2)
-    avg_price += rng.normal(0, 18, m).cumsum() * 0.10
-    monthly_price = pd.Series(avg_price, index=months, name="avg_price")
+    monthly_price_vals = _anchored_series(months, {
+        mi(2007, 1):  1500,
+        mi(2007, 12): 2200,   # peak
+        mi(2009, 12): 1700,
+        mi(2010, 12): 1300,   # bottom
+        mi(2012, 12): 1350,
+        mi(2014, 12): 1450,
+        mi(2017, 12): 1700,
+        mi(2019, 12): 1850,
+        mi(2021, 12): 2300,
+        mi(2023, 12): 3100,
+        mi(2025, 12): 3800,
+        mi(2026, 4):  4000,
+    }, noise_std=20, seed=7)
+    monthly_price = pd.Series(monthly_price_vals, index=months, name="avg_price")
 
-    # ----- quarterly indicators -----
-    quarters = pd.date_range(start="2015-01-01", end="2026-04-01", freq="QS")
-    n = len(quarters)
-    t = np.arange(n)
+    # ----- monthly underlying series (will be resampled to quarterly) -----
+    permits_m = _anchored_series(months, {
+        mi(2007, 6):  3000,
+        mi(2008, 6):  2700,
+        mi(2010, 6):  500,    # bust trough
+        mi(2013, 6):  700,
+        mi(2015, 6):  850,
+        mi(2018, 6):  1300,
+        mi(2020, 6):  1100,   # COVID dip
+        mi(2022, 6):  1700,
+        mi(2024, 6):  1800,
+        mi(2026, 4):  1900,
+    }, noise_std=80, seed=11)
+    # add Q4-peaked seasonality so quarterly sums show seasonal pattern
+    season = 250 * np.sin(2 * np.pi * (np.arange(len(months)) + 4) / 12)
+    permits_m = np.clip(permits_m + season, 200, None)
 
-    # Permits: trend + Q4 seasonality + boom around 2023
-    permits = 6500 + t * 230 + 1800 * np.sin(2 * np.pi * (t + 1) / 4)
-    permits += 2200 * np.exp(-((t - 32) ** 2) / 40) + rng.normal(0, 700, n)
-    permits = np.clip(permits, 3000, None)
+    mortgages_m = _anchored_series(months, {
+        mi(2007, 1):  2.0,
+        mi(2008, 12): 3.5,    # peak before stagnation
+        mi(2010, 12): 3.6,
+        mi(2013, 12): 3.0,    # post-crisis low
+        mi(2015, 12): 3.5,
+        mi(2018, 12): 5.0,
+        mi(2020, 12): 7.0,
+        mi(2022, 12): 10.0,
+        mi(2024, 12): 14.0,
+        mi(2026, 2):  17.3,
+        mi(2026, 4):  17.7,
+    }, noise_std=0.04, seed=13)
 
-    # Mortgage stock EUR bn: ~3.5 → ~17.3 with a cycle so YoY% has dynamics
-    mortgages = 3.5 * np.exp(0.035 * t)
-    mortgages += 0.6 * np.sin(2 * np.pi * t / 14)   # cycle ~3.5yr
-    mortgages += rng.normal(0, 0.08, n).cumsum() * 0.1
+    nfc_m = _anchored_series(months, {
+        mi(2007, 1):  0.8,
+        mi(2009, 6):  2.1,    # peak
+        mi(2012, 6):  1.7,
+        mi(2014, 12): 1.55,
+        mi(2018, 12): 1.7,
+        mi(2021, 12): 1.95,
+        mi(2024, 12): 2.25,
+        mi(2026, 4):  2.35,
+    }, noise_std=0.02, seed=17)
 
-    # NFC real-estate loan stock
-    nfc_loans = 1.4 + t * 0.06 + 0.35 * np.sin(2 * np.pi * t / 12)
-    nfc_loans += rng.normal(0, 0.05, n).cumsum() * 0.08
+    # ----- aggregate monthly → quarterly -----
+    permits_s   = pd.Series(permits_m,   index=months)
+    mortgages_s = pd.Series(mortgages_m, index=months)
+    nfc_s       = pd.Series(nfc_m,       index=months)
 
-    avg_price_q = monthly_price.resample("QS").last().reindex(quarters)
-    quarterly = pd.DataFrame(
-        {"avg_price": avg_price_q.values, "permits": permits,
-         "mortgages": mortgages, "nfc_loans": nfc_loans},
-        index=quarters,
-    )
+    quarterly = pd.DataFrame({
+        "avg_price": monthly_price.resample("QS").last(),
+        "permits":   permits_s.resample("QS").sum(),     # flow → sum
+        "mortgages": mortgages_s.resample("QS").last(),  # stock → last
+        "nfc_loans": nfc_s.resample("QS").last(),        # stock → last
+    }).dropna()
+
     return quarterly, monthly_price
 
 
