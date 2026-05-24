@@ -1,23 +1,24 @@
 """
-Bulgarian Housing COT Indicator.
-
-Layout (5 panes):
-  1) Average housing price (BGN / m²) — monthly OHLC candles
-  2) COT Index — Commercials / Non-commercials / Retailers (combined)
-  3) Commercials only        (NSI developer building permits, YoY%)
-  4) Non-commercials only    (БНБ NFC real-estate loan stock, YoY%)
-  5) Retailers only          (БНБ household mortgage stock, YoY%)
-
-Williams COT Index = (x - min) / (max - min) * 100
-Applied to the YoY % CHANGE of each underlying series, so a long trend
-in the raw stock doesn't pin the index at 100.
-
-Lookback = 26 quarters. Thresholds at 80 / 20.
+Bulgarian Housing — COT Indicator + Valuation + Seasonality.
 
 Outputs:
-  bg_housing_cot.png   (static)
-  bg_housing_cot.html  (interactive, open in browser)
-  bg_housing_cot.csv   (model values)
+  bg_housing_cot.png         COT view (static)
+  bg_housing_cot.html        COT view (interactive)
+  bg_housing_valuation.html  Valuation + Seasonality view (interactive)
+  bg_housing_cot.csv         model values
+
+COT view (5 panes):
+  Avg price (EUR / m², monthly candles)
+  COT Index combined  +  Commercials / Non-commercials / Retailers
+
+Valuation view (4 panes):
+  Avg price (EUR / m², monthly candles)
+  UTC-style Valuation, 1-month analysis window, 12-month rescale
+  UTC-style Valuation, 4-month analysis window, 12-month rescale
+  Seasonality — average yearly path (last 4 years) vs current year
+
+References for valuation: EUR/USD, EURIBOR 12M (proxy for mortgage cost).
+BGN is pegged to EUR at 1.95583 since 1999, so EUR price = BGN / 1.95583.
 
 LIVE=1 → fetch real series (Eurostat + ECB SDW)
 """
@@ -39,6 +40,21 @@ LOOKBACK_QUARTERS = 26
 UPPER_THRESHOLD = 80
 LOWER_THRESHOLD = 20
 INTRA_MONTH_VOL_PCT = 0.010   # ±1.0% intra-month synthetic range for candles
+
+# Currency board peg (fixed since 1999)
+BGN_PER_EUR = 1.95583
+
+# UTC-style Valuation thresholds
+VAL_UPPER = 75
+VAL_LOWER = -75
+
+# Valuation windows (in months)
+VAL_ANALYSIS_1M = 1
+VAL_ANALYSIS_4M = 4
+VAL_RESCALE_MONTHS = 12
+
+# Seasonality lookback
+SEASONALITY_YEARS = 4
 
 EUROSTAT_BASE = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data"
 ECB_BASE = "https://data-api.ecb.europa.eu/service/data"
@@ -81,16 +97,21 @@ def fetch_live_data():
         "prc_hpi_q",
         {"geo": "BG", "purchase": "TOTAL", "unit": "I15_Q"},
     )
-    # quarterly indicators
+    eurusd = _fetch_ecb("EXR/M.USD.EUR.SP00.A")
+    euribor12m = _fetch_ecb("FM/M.U2.EUR.RT.MM.EURIBOR1YD_.HSTA")
+
     quarterly = pd.DataFrame({
         "avg_price": hpi.resample("QS").last(),
         "permits": permits,
         "nfc_loans": nfc_re.resample("QS").last(),
         "mortgages": mortgages.resample("QS").last(),
     }).dropna()
-    # monthly avg_price for candles — НСИ is quarterly, interpolate to monthly
     monthly_price = hpi.resample("MS").interpolate(method="time")
-    return quarterly, monthly_price
+    macros = pd.DataFrame({
+        "eurusd":     eurusd.resample("MS").last(),
+        "euribor12m": euribor12m.resample("MS").last(),
+    }).dropna()
+    return quarterly, monthly_price, macros
 
 
 # ---------- Synthetic demo data ----------
@@ -198,7 +219,45 @@ def synthetic_demo_data():
         "nfc_loans": nfc_s.resample("QS").last(),        # stock → last
     }).dropna()
 
-    return quarterly, monthly_price
+    # ----- macro references (monthly) -----
+    eurusd_vals = _anchored_series(months, {
+        mi(2007, 1):  1.30,
+        mi(2007, 7):  1.36,
+        mi(2008, 4):  1.59,   # EUR peak
+        mi(2008, 12): 1.30,
+        mi(2010, 6):  1.22,
+        mi(2011, 5):  1.45,
+        mi(2014, 12): 1.21,
+        mi(2017, 1):  1.06,
+        mi(2018, 4):  1.24,
+        mi(2020, 3):  1.10,
+        mi(2021, 5):  1.20,
+        mi(2022, 9):  0.96,   # parity
+        mi(2024, 7):  1.09,
+        mi(2026, 4):  1.10,
+    }, noise_std=0.008, seed=21)
+
+    euribor12m_vals = _anchored_series(months, {
+        mi(2007, 1):  4.10,
+        mi(2008, 9):  5.50,   # peak before crisis cuts
+        mi(2009, 12): 1.25,
+        mi(2011, 7):  2.18,   # brief Trichet hike
+        mi(2013, 12): 0.55,
+        mi(2016, 1):  -0.05,  # negative territory
+        mi(2019, 12): -0.25,
+        mi(2021, 12): -0.50,
+        mi(2022, 7):  0.99,
+        mi(2023, 9):  4.20,   # peak hike
+        mi(2024, 12): 2.43,
+        mi(2026, 4):  2.20,
+    }, noise_std=0.04, seed=23)
+
+    macros = pd.DataFrame({
+        "eurusd":     eurusd_vals,
+        "euribor12m": euribor12m_vals,
+    }, index=months)
+
+    return quarterly, monthly_price, macros
 
 
 # ---------- COT Index ----------
@@ -230,6 +289,72 @@ def build_cot_model(df):
         "commercials":    williams_cot_index(perm_yoy, LOOKBACK_QUARTERS),
         "noncommercials": williams_cot_index(nfc_yoy,  LOOKBACK_QUARTERS),
     }, index=df.index)
+
+
+# ---------- UTC-style Valuation ----------
+
+def utc_valuation(price, refs, analysis_period, rescale_period):
+    """
+    UTC-style multi-reference valuation score, ±100.
+
+    For each reference series, compute the % change in
+    (price / reference) over `analysis_period`. Average those spreads
+    across references, then rescale to ±100 over `rescale_period`.
+
+    Positive  → price has run UP faster than the reference basket
+                (housing expensive vs EUR strength / cost of money)
+    Negative  → the reverse (housing cheap)
+    """
+    components = []
+    for ref in refs:
+        merged = pd.concat([price.rename("p"), ref.rename("r")], axis=1).dropna()
+        ratio = merged["p"] / merged["r"]
+        components.append(ratio.pct_change(analysis_period) * 100)
+    combined = pd.concat(components, axis=1).mean(axis=1)
+
+    rmin = combined.rolling(rescale_period).min()
+    rmax = combined.rolling(rescale_period).max()
+    mid = (rmin + rmax) / 2.0
+    half = (rmax - rmin) / 2.0
+    return ((combined - mid) / half * 100).clip(-100, 100)
+
+
+# ---------- Seasonality ----------
+
+def seasonality(price_monthly, lookback_years=SEASONALITY_YEARS):
+    """
+    Average yearly path of price as % from each year's January.
+
+    Returns:
+      seasonal_avg  pd.Series indexed 1..12 (month-of-year)
+      current_path  pd.Series indexed 1..12 — current year so far
+    """
+    end = price_monthly.index.max()
+    cur_year = end.year
+    # take last `lookback_years` COMPLETE prior calendar years for the average
+    first_year = cur_year - lookback_years
+    paths = []
+    for yr in range(first_year, cur_year):
+        grp = price_monthly[price_monthly.index.year == yr]
+        # need January present so the relative path starts at 0%
+        if len(grp) < 6 or grp.index.month[0] != 1:
+            continue
+        rel = ((grp.values / grp.values[0]) - 1.0) * 100
+        paths.append(pd.Series(rel, index=grp.index.month))
+
+    if paths:
+        seasonal_avg = pd.concat(paths, axis=1).mean(axis=1)
+    else:
+        seasonal_avg = pd.Series(dtype=float)
+
+    cur = price_monthly[price_monthly.index.year == cur_year]
+    if len(cur):
+        cur_rel = ((cur.values / cur.values[0]) - 1.0) * 100
+        cur_path = pd.Series(cur_rel, index=cur.index.month)
+    else:
+        cur_path = pd.Series(dtype=float)
+
+    return seasonal_avg, cur_path
 
 
 # ---------- OHLC for monthly price ----------
@@ -308,9 +433,9 @@ def plot_model(model, monthly_price, out_path, source_label):
     # 1) Avg price candles
     ax = axes[0]
     _draw_candles(ax, ohlc, width_days=22)
-    ax.set_title("Average housing price (BGN / m²) — monthly candles",
+    ax.set_title("Average housing price (EUR / m², BGN÷1.95583) — monthly candles",
                  loc="left", fontsize=10, fontweight="bold")
-    ax.set_ylabel("BGN / m²")
+    ax.set_ylabel("EUR / m²")
     ax.grid(True, alpha=0.25)
     last_c = float(ohlc["close"].iloc[-1])
     ax.annotate(
@@ -390,7 +515,7 @@ def plot_html(model, monthly_price, out_path, source_label):
         row_heights=[0.30, 0.24, 0.155, 0.155, 0.155],
         vertical_spacing=0.035,
         subplot_titles=(
-            "Average housing price (BGN / m²) — monthly candles",
+            "Average housing price (EUR / m², BGN÷1.95583) — monthly candles",
             f"COT Index — Williams %R, {LOOKBACK_QUARTERS}Q lookback",
             "Commercials — developer building permits (YoY% → COT)",
             "Non-commercials — NFC real-estate loan stock (YoY% → COT)",
@@ -432,7 +557,7 @@ def plot_html(model, monthly_price, out_path, source_label):
     _add_cot_traces(fig, model["noncommercials"], "Non-commercials", YELLOW, row=4, show_legend=False)
     _add_cot_traces(fig, model["retailers"],      "Retailers",       RED,    row=5, show_legend=False)
 
-    fig.update_yaxes(title_text="BGN / m²", row=1, col=1)
+    fig.update_yaxes(title_text="EUR / m²", row=1, col=1)
     for r in (2, 3, 4, 5):
         fig.update_yaxes(title_text="COT (0–100)", row=r, col=1)
     fig.update_xaxes(rangeslider_visible=False, row=1, col=1)
@@ -453,26 +578,152 @@ def plot_html(model, monthly_price, out_path, source_label):
     fig.write_html(out_path, include_plotlyjs="cdn", full_html=True)
 
 
+def plot_valuation_html(monthly_price_eur, macros, out_path, source_label):
+    """
+    Valuation + Seasonality view (interactive HTML, 4 panes):
+      1) Avg price candles (EUR / m²)
+      2) Valuation 1M  (1-month analysis, 12-month rescale)
+      3) Valuation 4M  (4-month analysis, 12-month rescale)
+      4) Seasonality   (avg yearly path, last N years, vs current year)
+    """
+    aligned = pd.concat(
+        [monthly_price_eur.rename("price"),
+         macros["eurusd"], macros["euribor12m"]],
+        axis=1,
+    ).dropna()
+    price = aligned["price"]
+    refs = [
+        aligned["eurusd"],
+        # shift EURIBOR off zero so ratios are well-defined when negative
+        (aligned["euribor12m"] + 6.0),
+    ]
+
+    val_1m = utc_valuation(price, refs, VAL_ANALYSIS_1M, VAL_RESCALE_MONTHS)
+    val_4m = utc_valuation(price, refs, VAL_ANALYSIS_4M, VAL_RESCALE_MONTHS)
+    seasonal_avg, cur_path = seasonality(price, SEASONALITY_YEARS)
+
+    ohlc = synthesize_monthly_ohlc(price)
+
+    fig = make_subplots(
+        rows=4, cols=1, shared_xaxes=False,
+        row_heights=[0.36, 0.21, 0.21, 0.22],
+        vertical_spacing=0.075,
+        subplot_titles=(
+            "Average housing price (EUR / m², BGN÷1.95583) — monthly candles",
+            f"Valuation 1M — vs EUR/USD + EURIBOR 12M (1-mo window, 12-mo rescale)",
+            f"Valuation 4M — vs EUR/USD + EURIBOR 12M (4-mo window, 12-mo rescale)",
+            f"Seasonality — avg yearly path, last {SEASONALITY_YEARS} years vs current year",
+        ),
+    )
+
+    # 1) price candles
+    fig.add_trace(go.Candlestick(
+        x=ohlc.index, open=ohlc["open"], high=ohlc["high"],
+        low=ohlc["low"], close=ohlc["close"],
+        name="Avg price (EUR/m²)",
+        increasing_line_color=GREEN, increasing_fillcolor=GREEN,
+        decreasing_line_color=RED,   decreasing_fillcolor=RED,
+        showlegend=False,
+    ), row=1, col=1)
+    fig.update_xaxes(rangeslider_visible=False, row=1, col=1)
+
+    # 2) Valuation 1M  — purple (TradingView style)
+    s = val_1m.dropna()
+    fig.add_trace(go.Scatter(
+        x=s.index, y=s.values, mode="lines", name="Valuation 1M",
+        line=dict(color="#a040ff", width=1.6),
+        hovertemplate="Val 1M: %{y:.1f}<extra></extra>",
+        showlegend=False,
+    ), row=2, col=1)
+    fig.add_hline(y=VAL_UPPER, line=dict(color=RED,   width=1, dash="dash"), row=2, col=1)
+    fig.add_hline(y=VAL_LOWER, line=dict(color=GREEN, width=1, dash="dash"), row=2, col=1)
+    fig.add_hline(y=0,         line=dict(color="#888", width=0.7), row=2, col=1)
+    fig.update_yaxes(range=[-110, 110], row=2, col=1)
+
+    # 3) Valuation 4M
+    s = val_4m.dropna()
+    fig.add_trace(go.Scatter(
+        x=s.index, y=s.values, mode="lines", name="Valuation 4M",
+        line=dict(color=BLUE, width=1.6),
+        hovertemplate="Val 4M: %{y:.1f}<extra></extra>",
+        showlegend=False,
+    ), row=3, col=1)
+    fig.add_hline(y=VAL_UPPER, line=dict(color=RED,   width=1, dash="dash"), row=3, col=1)
+    fig.add_hline(y=VAL_LOWER, line=dict(color=GREEN, width=1, dash="dash"), row=3, col=1)
+    fig.add_hline(y=0,         line=dict(color="#888", width=0.7), row=3, col=1)
+    fig.update_yaxes(range=[-110, 110], row=3, col=1)
+
+    # 4) Seasonality
+    if len(seasonal_avg):
+        fig.add_trace(go.Scatter(
+            x=seasonal_avg.index, y=seasonal_avg.values, mode="lines+markers",
+            name=f"Avg of last {SEASONALITY_YEARS} yrs",
+            line=dict(color="#a040ff", width=2),
+            hovertemplate="Month %{x}: %{y:+.1f}%<extra></extra>",
+        ), row=4, col=1)
+    if len(cur_path):
+        fig.add_trace(go.Scatter(
+            x=cur_path.index, y=cur_path.values, mode="lines+markers",
+            name="Current year",
+            line=dict(color=BLUE, width=2, dash="dot"),
+            hovertemplate="Month %{x}: %{y:+.1f}%<extra></extra>",
+        ), row=4, col=1)
+    fig.update_xaxes(
+        tickmode="array",
+        tickvals=list(range(1, 13)),
+        ticktext=["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+        row=4, col=1,
+    )
+
+    fig.update_yaxes(title_text="EUR / m²", row=1, col=1)
+    fig.update_yaxes(title_text="Valuation", row=2, col=1)
+    fig.update_yaxes(title_text="Valuation", row=3, col=1)
+    fig.update_yaxes(title_text="% from Jan", row=4, col=1)
+    fig.update_xaxes(title_text="Date",     row=3, col=1)
+    fig.update_xaxes(title_text="Month",    row=4, col=1)
+
+    fig.update_layout(
+        title=dict(
+            text=f"<b>Bulgarian Housing — Valuation & Seasonality</b>  ·  data: {source_label}",
+            x=0.02, xanchor="left",
+        ),
+        template="plotly_white",
+        height=1180,
+        hovermode="closest",
+        legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
+        margin=dict(l=60, r=40, t=90, b=50),
+    )
+    fig.write_html(out_path, include_plotlyjs="cdn", full_html=True)
+
+
 # ---------- Entry point ----------
 
 def main():
     live = os.environ.get("LIVE") == "1"
     if live:
-        quarterly, monthly_price = fetch_live_data()
+        quarterly, monthly_price, macros = fetch_live_data()
         source_label = "LIVE (Eurostat + ECB SDW)"
     else:
-        quarterly, monthly_price = synthetic_demo_data()
+        quarterly, monthly_price, macros = synthetic_demo_data()
         source_label = "SYNTHETIC (calibrated to published БНБ / НСИ stats)"
+
+    # Convert prices BGN → EUR using fixed currency-board peg
+    quarterly["avg_price"] = quarterly["avg_price"] / BGN_PER_EUR
+    monthly_price_eur = monthly_price / BGN_PER_EUR
 
     model = build_cot_model(quarterly)
     model.to_csv("bg_housing_cot.csv", float_format="%.2f")
-    plot_model(model, monthly_price, "bg_housing_cot.png", source_label)
-    plot_html(model, monthly_price, "bg_housing_cot.html", source_label)
+    plot_model(model, monthly_price_eur, "bg_housing_cot.png", source_label)
+    plot_html(model, monthly_price_eur, "bg_housing_cot.html", source_label)
+    plot_valuation_html(monthly_price_eur, macros,
+                        "bg_housing_valuation.html", source_label)
 
     print(f"Source: {source_label}")
-    print("Wrote bg_housing_cot.csv, bg_housing_cot.png, bg_housing_cot.html")
+    print("Wrote: bg_housing_cot.csv, bg_housing_cot.png,")
+    print("       bg_housing_cot.html, bg_housing_valuation.html")
     print()
-    print("Last 4 quarters (COT):")
+    print("Last 4 quarters (COT, price in EUR/m²):")
     print(model[["avg_price", "commercials", "noncommercials", "retailers"]]
           .dropna().tail(4).round(1).to_string())
 
