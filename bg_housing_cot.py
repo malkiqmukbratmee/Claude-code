@@ -31,11 +31,17 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from matplotlib.patches import Rectangle
 
 
 LOOKBACK_QUARTERS = 26
 UPPER_THRESHOLD = 80
 LOWER_THRESHOLD = 20
+
+# Intra-month volatility model for synthesized OHLC range.
+# BG housing has no daily price feed; this is a calibrated synthetic spread
+# around the real month-end value. ~1.2% mirrors typical BG REIT daily ranges.
+INTRA_MONTH_VOL_PCT = 0.012
 
 EUROSTAT_BASE = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data"
 ECB_BASE = "https://data-api.ecb.europa.eu/service/data"
@@ -62,7 +68,7 @@ def _fetch_ecb(series_key: str) -> pd.Series:
     return df.set_index("TIME_PERIOD")["OBS_VALUE"].sort_index()
 
 
-def fetch_live_data() -> pd.DataFrame:
+def fetch_live_data() -> tuple:
     permits = _fetch_eurostat(
         "sts_cobp_q",
         {"geo": "BG", "indic_bt": "PSQM", "unit": "I15", "s_adj": "NSA"},
@@ -73,20 +79,26 @@ def fetch_live_data() -> pd.DataFrame:
         "prc_hpi_q",
         {"geo": "BG", "purchase": "TOTAL", "unit": "I15_Q"},
     )
+    monthly = pd.DataFrame({
+        "mortgage_stock": mortgages,
+        "nfc_loans_stock": nfc_re,
+    }).dropna()
     monthly_to_q = lambda s: s.resample("QS").sum()
-    df = pd.DataFrame({
+    quarterly = pd.DataFrame({
         "hpi": hpi.resample("QS").last(),
         "permits": permits,
         "nfc_loans": monthly_to_q(nfc_re),
         "mortgages": monthly_to_q(mortgages),
     }).dropna()
-    return df
+    return quarterly, monthly
 
 
 # ---------- Synthetic demo data (calibrated to published BG stats) ----------
 
-def synthetic_demo_data() -> pd.DataFrame:
+def synthetic_demo_data() -> tuple:
     """
+    Returns (quarterly_df, monthly_df).
+
     Anchors used (real, published):
       HPI Q4 2025 ~ 210 (2015 = 100)
       Permits Q4 2025 ~ 15,642 dwellings
@@ -94,12 +106,28 @@ def synthetic_demo_data() -> pd.DataFrame:
       Total transactions 2025 ~ 226,513
     """
     rng = np.random.default_rng(7)
+
+    # --- Monthly series (mortgage stock + NFC RE loans, EUR bn) ---
+    months = pd.date_range(start="2015-01-01", end="2026-04-01", freq="MS")
+    m = len(months)
+    tm = np.arange(m)
+    # Mortgage stock: ~3.5bn in 2015 → ~17.3bn by early 2026 (≈+27.8% YoY tail)
+    mortgage_stock = 3.5 * np.exp(0.0118 * tm) + 0.4 * np.sin(2 * np.pi * tm / 36)
+    mortgage_stock += rng.normal(0, 0.04, m).cumsum() * 0.08
+    # NFC real-estate loan stock
+    nfc_stock = 1.4 + tm * 0.018 + 0.35 * np.sin(2 * np.pi * tm / 36)
+    nfc_stock += rng.normal(0, 0.03, m).cumsum() * 0.05
+    monthly = pd.DataFrame(
+        {"mortgage_stock": mortgage_stock, "nfc_loans_stock": nfc_stock},
+        index=months,
+    )
+
+    # --- Quarterly series for COT model ---
     quarters = pd.date_range(start="2015-01-01", end="2026-04-01", freq="QS")
     n = len(quarters)
     t = np.arange(n)
 
     # HPI: flat-ish 2015-2019, accelerating boom 2020-2025
-    # anchor: ~210 by Q4 2025 (2015 = 100), then small post-euro pullback
     excess = np.maximum(t - 20, 0).astype(float)
     base = np.where(t < 20, 100 + t * 1.6, 132 + (excess ** 1.5) * 0.65)
     hpi = base + rng.normal(0, 1.2, n).cumsum() * 0.25
@@ -107,22 +135,62 @@ def synthetic_demo_data() -> pd.DataFrame:
     # Permits: trend + Q4-peaked seasonality + boom-bust cycle
     permits_trend = 6500 + t * 230
     seasonality = 1800 * np.sin(2 * np.pi * (t + 1) / 4)
-    boom = 2200 * np.exp(-((t - 32) ** 2) / 40)  # peak around 2023
+    boom = 2200 * np.exp(-((t - 32) ** 2) / 40)
     permits = permits_trend + seasonality + boom + rng.normal(0, 700, n)
     permits = np.clip(permits, 3000, None)
 
-    # NFC real-estate loans (EUR bn, quarterly flow proxy)
-    nfc_cycle = 0.35 * np.sin(2 * np.pi * t / 18)
-    nfc_loans = 1.4 + t * 0.06 + nfc_cycle + rng.normal(0, 0.08, n).cumsum() * 0.05
+    # Aggregate monthly → quarterly (last for stocks)
+    mortgages_q = monthly["mortgage_stock"].resample("QS").last().reindex(quarters)
+    nfc_q = monthly["nfc_loans_stock"].resample("QS").last().reindex(quarters)
 
-    # Household mortgage origination (EUR bn, quarterly)
-    mortgage = 0.18 + t * 0.014 + np.exp(t / 38) * 0.06 + rng.normal(0, 0.05, n)
-    mortgage = np.clip(mortgage, 0.1, None)
-
-    return pd.DataFrame(
-        {"hpi": hpi, "permits": permits, "nfc_loans": nfc_loans, "mortgages": mortgage},
+    quarterly = pd.DataFrame(
+        {"hpi": hpi, "permits": permits, "nfc_loans": nfc_q.values, "mortgages": mortgages_q.values},
         index=quarters,
     )
+    return quarterly, monthly
+
+
+# ---------- OHLC + interpolation ----------
+
+def synthesize_monthly_ohlc(monthly: pd.Series, vol_pct: float = INTRA_MONTH_VOL_PCT, seed: int = 11) -> pd.DataFrame:
+    """
+    Build monthly OHLC from a single monthly observation.
+
+      close = month-end value (real)
+      open  = previous month's close (real)
+      high  = max(open, close) * (1 + r_h)   with r_h ~ U(0, vol_pct)
+      low   = min(open, close) * (1 - r_l)   with r_l ~ U(0, vol_pct)
+
+    The H / L spread is SYNTHETIC — BG mortgage stock has no intra-month
+    high / low; this is a calibrated volatility model around real anchors.
+    """
+    rng = np.random.default_rng(seed)
+    closes = monthly.values.astype(float)
+    opens = np.concatenate(([closes[0]], closes[:-1]))
+    body_hi = np.maximum(opens, closes)
+    body_lo = np.minimum(opens, closes)
+    h_extra = rng.uniform(0, vol_pct, len(closes)) * body_hi
+    l_extra = rng.uniform(0, vol_pct, len(closes)) * body_lo
+    return pd.DataFrame(
+        {
+            "open": opens,
+            "high": body_hi + h_extra,
+            "low": body_lo - l_extra,
+            "close": closes,
+        },
+        index=monthly.index,
+    )
+
+
+def weekly_interpolate(monthly: pd.Series) -> pd.Series:
+    """
+    Cubic-spline interpolation of monthly observations onto weekly index.
+    SYNTHETIC — purely a visual smoother; no real weekly data exists.
+    """
+    weekly_idx = pd.date_range(monthly.index.min(), monthly.index.max(), freq="W-MON")
+    combined = pd.concat([monthly, pd.Series(np.nan, index=weekly_idx)]).sort_index()
+    combined = combined[~combined.index.duplicated(keep="first")]
+    return combined.interpolate(method="cubic").reindex(weekly_idx)
 
 
 # ---------- COT Index ----------
@@ -185,6 +253,95 @@ def _draw_pane(ax, pane: Pane, last_dates: pd.DatetimeIndex):
     ax.xaxis.set_minor_locator(mdates.MonthLocator(bymonth=[1, 4, 7, 10]))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
     ax.tick_params(axis="x", which="major", labelsize=9)
+
+
+def _draw_candles(ax, ohlc: pd.DataFrame, width_days: float = 22):
+    up = "#34c759"
+    down = "#ff3b30"
+    for date, row in ohlc.iterrows():
+        x = mdates.date2num(date)
+        o, h, l, c = row["open"], row["high"], row["low"], row["close"]
+        color = up if c >= o else down
+        ax.plot([x, x], [l, h], color=color, lw=1.0, zorder=2)
+        body_lo = min(o, c)
+        height = abs(c - o)
+        if height < 1e-6:
+            height = (h - l) * 0.05 or 1e-3
+        rect = Rectangle(
+            (x - width_days / 2, body_lo),
+            width_days,
+            height,
+            facecolor=color,
+            edgecolor=color,
+            zorder=3,
+        )
+        ax.add_patch(rect)
+
+
+def plot_price_chart(monthly: pd.DataFrame, out_path: str, source_label: str):
+    """
+    Two-pane price view:
+      1) Monthly OHLC candles of БНБ mortgage stock (proxy price for the housing
+         market). H/L is synthesized via calibrated intra-month volatility.
+      2) Weekly cubic-spline interpolation of the same monthly series (visual
+         only; no real weekly data exists for BG housing).
+    """
+    ohlc = synthesize_monthly_ohlc(monthly["mortgage_stock"])
+    weekly = weekly_interpolate(monthly["mortgage_stock"])
+
+    fig, axes = plt.subplots(2, 1, figsize=(15, 9), sharex=True,
+                             gridspec_kw={"height_ratios": [3, 2]})
+    fig.suptitle(
+        "Bulgarian Housing — Price-style View  ·  Mortgage Stock (БНБ) as "
+        f"market proxy  ·  data: {source_label}",
+        fontsize=12, fontweight="bold", y=0.995,
+    )
+
+    # --- Candles ---
+    ax = axes[0]
+    _draw_candles(ax, ohlc, width_days=22)
+    ax.set_title(
+        "Monthly OHLC candles — close is real БНБ month-end stock; "
+        "H / L is synthetic intra-month range (±1.2%)",
+        loc="left", fontsize=10, fontweight="bold",
+    )
+    ax.set_ylabel("Mortgage stock (EUR bn)")
+    ax.grid(True, alpha=0.25)
+    last_c = float(ohlc["close"].iloc[-1])
+    last_d = ohlc.index[-1]
+    ax.annotate(
+        f"{last_c:,.2f}",
+        xy=(last_d, last_c), xytext=(8, 0), textcoords="offset points",
+        va="center", fontsize=9, fontweight="bold",
+        color=("#34c759" if ohlc["close"].iloc[-1] >= ohlc["open"].iloc[-1] else "#ff3b30"),
+    )
+    ax.set_xlim(monthly.index.min() - pd.Timedelta(days=20),
+                monthly.index.max() + pd.Timedelta(days=40))
+
+    # --- Weekly subchart ---
+    ax2 = axes[1]
+    ax2.plot(weekly.index, weekly.values, color="#1f77b4", lw=1.3,
+             label="Weekly interp. (synthetic)")
+    ax2.scatter(monthly.index, monthly["mortgage_stock"].values,
+                color="#1f77b4", s=14, zorder=4, label="Monthly close (real)")
+    ax2.set_title(
+        "Weekly subchart — cubic-spline interpolation of monthly closes "
+        "(no real weekly data exists)",
+        loc="left", fontsize=10, fontweight="bold",
+    )
+    ax2.set_ylabel("EUR bn")
+    ax2.grid(True, alpha=0.25)
+    ax2.legend(loc="upper left", fontsize=8, framealpha=0.9)
+
+    for ax_ in axes:
+        ax_.xaxis.set_major_locator(mdates.YearLocator())
+        ax_.xaxis.set_minor_locator(mdates.MonthLocator(bymonth=[1, 4, 7, 10]))
+        ax_.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
+
+    axes[-1].set_xlabel("Date")
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
+    plt.savefig(out_path, dpi=140, bbox_inches="tight")
+    plt.close(fig)
 
 
 def plot_model(df: pd.DataFrame, out_path: str, source_label: str):
@@ -250,25 +407,34 @@ def plot_model(df: pd.DataFrame, out_path: str, source_label: str):
 def main():
     live = os.environ.get("LIVE") == "1"
     if live:
-        raw = fetch_live_data()
+        quarterly, monthly = fetch_live_data()
         source_label = "LIVE (Eurostat + ECB SDW)"
     else:
-        raw = synthetic_demo_data()
+        quarterly, monthly = synthetic_demo_data()
         source_label = "SYNTHETIC (calibrated to published БНБ / НСИ stats)"
 
-    model = build_cot_model(raw)
+    model = build_cot_model(quarterly)
 
-    out_csv = "bg_housing_cot.csv"
-    out_png = "bg_housing_cot.png"
-    model.to_csv(out_csv, float_format="%.3f")
-    plot_model(model, out_png, source_label)
+    out_cot_csv = "bg_housing_cot.csv"
+    out_cot_png = "bg_housing_cot.png"
+    out_price_png = "bg_housing_price.png"
+    out_monthly_csv = "bg_housing_monthly.csv"
 
-    last = model.dropna().tail(4)
+    model.to_csv(out_cot_csv, float_format="%.3f")
+    monthly.to_csv(out_monthly_csv, float_format="%.4f")
+    plot_model(model, out_cot_png, source_label)
+    plot_price_chart(monthly, out_price_png, source_label)
+
+    last_q = model.dropna().tail(4)
+    last_m = synthesize_monthly_ohlc(monthly["mortgage_stock"]).tail(6)
     print(f"Source: {source_label}")
-    print(f"Wrote {out_csv} and {out_png}")
+    print(f"Wrote {out_cot_csv}, {out_monthly_csv}, {out_cot_png}, {out_price_png}")
     print()
-    print("Last 4 quarters:")
-    print(last.round(1).to_string())
+    print("Last 4 quarters (COT model):")
+    print(last_q.round(1).to_string())
+    print()
+    print("Last 6 monthly OHLC candles (mortgage stock, EUR bn):")
+    print(last_m.round(3).to_string())
 
 
 if __name__ == "__main__":
