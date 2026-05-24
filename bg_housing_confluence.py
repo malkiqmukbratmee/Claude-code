@@ -417,34 +417,196 @@ def _make_instrument_figure(name, result):
     return fig
 
 
-def build_html_report(results, macros, monthly_price_bg, out_path, source_label):
-    sections = []
-    for r in results:
-        fig = _make_instrument_figure(r["name"], r)
-        chart_div = fig.to_html(include_plotlyjs=False, full_html=False,
-                                div_id=f"chart_{abs(hash(r['name']))}")
-        sections.append(f"<section class='instrument'>{chart_div}</section>")
+def build_combined_html(cot_model, monthly_price_bg, macros,
+                        tradables_df, out_path, source_label):
+    """
+    All-in-one chart: candles (switchable across 3 instruments) + COT (4 panes)
+    + Valuation 1M + Valuation 4M + Seasonality.
 
-    html = f"""<!doctype html>
-<html><head><meta charset='utf-8'>
-<title>Tradables — Valuation + Seasonality</title>
-<script src='https://cdn.plot.ly/plotly-latest.min.js'></script>
-<style>
-  body {{ font-family: -apple-system, system-ui, sans-serif; margin: 24px;
-         background:#fafafa; color:#222; }}
-  h1 {{ margin-bottom: 4px; }}
-  .src {{ color:#666; font-size:13px; margin-bottom: 22px; }}
-  section.instrument {{ background:#fff; border:1px solid #ddd;
-                        border-radius:8px; padding:14px 18px;
-                        margin-bottom:22px; }}
-</style></head>
-<body>
-  <h1>Tradables — Valuation + Seasonality</h1>
-  <div class='src'>data: {source_label}</div>
-  {''.join(sections)}
-</body></html>"""
-    with open(out_path, "w") as f:
-        f.write(html)
+    The COT / Valuation / Seasonality panes ALL track BG average housing
+    (the underlying analysis). Only the top candle pane switches between:
+      BG avg housing, EU Property ETF, BG REIT 6A6.
+    """
+    # OHLC for each instrument
+    ohlc_bg     = synthesize_monthly_ohlc(monthly_price_bg, vol_pct=0.010)
+    ohlc_eu     = synthesize_monthly_ohlc(tradables_df["iprp"],   vol_pct=0.025)
+    ohlc_bgreit = synthesize_monthly_ohlc(tradables_df["bg_reit"], vol_pct=0.040)
+
+    # BG indicators
+    aligned = pd.concat([monthly_price_bg.rename("p"),
+                         macros["eurusd"], macros["euribor12m"]], axis=1).dropna()
+    refs = [aligned["eurusd"], aligned["euribor12m"] + 6.0]
+    val_1m = utc_valuation(aligned["p"], refs, VAL_ANALYSIS_1M, VAL_RESCALE_MONTHS)
+    val_4m = utc_valuation(aligned["p"], refs, VAL_ANALYSIS_4M, VAL_RESCALE_MONTHS)
+    seas_avg, seas_cur = seasonality(monthly_price_bg, SEASONALITY_YEARS)
+
+    fig = make_subplots(
+        rows=8, cols=1, shared_xaxes=False,
+        row_heights=[0.22, 0.14, 0.10, 0.10, 0.10, 0.10, 0.10, 0.14],
+        vertical_spacing=0.025,
+        subplot_titles=(
+            "Monthly candles (switchable)",
+            f"COT Index — Williams %R, {LOOKBACK_QUARTERS}Q lookback",
+            "Commercials — developer building permits (YoY% → COT)",
+            "Non-commercials — NFC real-estate loan stock (YoY% → COT)",
+            "Retailers — household mortgage stock (YoY% → COT)",
+            "Valuation 1M (vs EUR/USD + EURIBOR12M, 1-mo / 12-mo rescale)",
+            "Valuation 4M (vs EUR/USD + EURIBOR12M, 4-mo / 12-mo rescale)",
+            f"Seasonality — avg last {SEASONALITY_YEARS} yrs vs current year",
+        ),
+    )
+
+    # --- 3 candle traces on pane 1, only one visible at a time ---
+    candle_specs = [
+        ("BG avg housing (EUR / m²)", ohlc_bg,     True),
+        ("EU Property ETF (IPRP-like)", ohlc_eu,   False),
+        ("BG REIT 6A6 (Advance Terrafund-like)", ohlc_bgreit, False),
+    ]
+    for label, oh, vis in candle_specs:
+        fig.add_trace(go.Candlestick(
+            x=oh.index, open=oh["open"], high=oh["high"],
+            low=oh["low"], close=oh["close"],
+            increasing_line_color=GREEN, increasing_fillcolor=GREEN,
+            decreasing_line_color=RED,   decreasing_fillcolor=RED,
+            name=label, showlegend=False, visible=vis,
+        ), row=1, col=1)
+    fig.update_xaxes(rangeslider_visible=False, row=1, col=1)
+
+    # --- 2) COT combined ---
+    for label, col, color in [
+        ("Commercials",      "commercials",    GREEN),
+        ("Non-commercials",  "noncommercials", YELLOW),
+        ("Retailers",        "retailers",      RED),
+    ]:
+        s = cot_model[col].dropna()
+        fig.add_trace(go.Scatter(
+            x=s.index, y=s.values, mode="lines", name=label,
+            line=dict(color=color, width=1.5),
+            hovertemplate=label + ": %{y:.0f}<extra></extra>",
+            legendgroup="cot",
+        ), row=2, col=1)
+    for row in (2, 3, 4, 5):
+        fig.add_hline(y=UPPER_THRESHOLD, line=dict(color="#888", width=1, dash="dash"), row=row, col=1)
+        fig.add_hline(y=LOWER_THRESHOLD, line=dict(color="#888", width=1, dash="dash"), row=row, col=1)
+        fig.add_hrect(y0=UPPER_THRESHOLD, y1=100, fillcolor=RED, opacity=0.05,
+                      line_width=0, row=row, col=1)
+        fig.add_hrect(y0=0, y1=LOWER_THRESHOLD, fillcolor=GREEN, opacity=0.05,
+                      line_width=0, row=row, col=1)
+        fig.update_yaxes(range=[-5, 105], row=row, col=1)
+
+    # --- 3,4,5) Individual COT panes ---
+    for (col, color, row) in [
+        ("commercials",    GREEN,  3),
+        ("noncommercials", YELLOW, 4),
+        ("retailers",      RED,    5),
+    ]:
+        s = cot_model[col].dropna()
+        fig.add_trace(go.Scatter(
+            x=s.index, y=s.values, mode="lines", showlegend=False,
+            line=dict(color=color, width=1.6),
+            hovertemplate="%{y:.0f}<extra></extra>",
+        ), row=row, col=1)
+
+    # --- 6) Val 1M ---
+    s = val_1m.dropna()
+    fig.add_trace(go.Scatter(
+        x=s.index, y=s.values, mode="lines", showlegend=False,
+        line=dict(color="#a040ff", width=1.5),
+        hovertemplate="Val 1M: %{y:.1f}<extra></extra>",
+    ), row=6, col=1)
+    fig.add_hline(y=VAL_UPPER, line=dict(color=RED,   width=1, dash="dash"), row=6, col=1)
+    fig.add_hline(y=VAL_LOWER, line=dict(color=GREEN, width=1, dash="dash"), row=6, col=1)
+    fig.add_hline(y=0, line=dict(color="#888", width=0.7), row=6, col=1)
+    fig.update_yaxes(range=[-110, 110], row=6, col=1)
+
+    # --- 7) Val 4M ---
+    s = val_4m.dropna()
+    fig.add_trace(go.Scatter(
+        x=s.index, y=s.values, mode="lines", showlegend=False,
+        line=dict(color=BLUE, width=1.5),
+        hovertemplate="Val 4M: %{y:.1f}<extra></extra>",
+    ), row=7, col=1)
+    fig.add_hline(y=VAL_UPPER, line=dict(color=RED,   width=1, dash="dash"), row=7, col=1)
+    fig.add_hline(y=VAL_LOWER, line=dict(color=GREEN, width=1, dash="dash"), row=7, col=1)
+    fig.add_hline(y=0, line=dict(color="#888", width=0.7), row=7, col=1)
+    fig.update_yaxes(range=[-110, 110], row=7, col=1)
+
+    # --- 8) Seasonality ---
+    if len(seas_avg):
+        fig.add_trace(go.Scatter(
+            x=seas_avg.index, y=seas_avg.values, mode="lines+markers",
+            name=f"Seasonality avg ({SEASONALITY_YEARS}y)",
+            line=dict(color="#a040ff", width=2),
+            hovertemplate="M%{x}: %{y:+.1f}%<extra></extra>",
+            legendgroup="seas",
+        ), row=8, col=1)
+    if len(seas_cur):
+        fig.add_trace(go.Scatter(
+            x=seas_cur.index, y=seas_cur.values, mode="lines+markers",
+            name="Current year",
+            line=dict(color=BLUE, width=2, dash="dot"),
+            hovertemplate="M%{x}: %{y:+.1f}%<extra></extra>",
+            legendgroup="seas",
+        ), row=8, col=1)
+    fig.update_xaxes(
+        tickmode="array",
+        tickvals=list(range(1, 13)),
+        ticktext=["Jan","Feb","Mar","Apr","May","Jun",
+                  "Jul","Aug","Sep","Oct","Nov","Dec"],
+        row=8, col=1,
+    )
+
+    # Y-axis titles
+    fig.update_yaxes(title_text="Price",     row=1, col=1)
+    fig.update_yaxes(title_text="COT 0-100", row=2, col=1)
+    fig.update_yaxes(title_text="Com",       row=3, col=1)
+    fig.update_yaxes(title_text="Non-com",   row=4, col=1)
+    fig.update_yaxes(title_text="Ret",       row=5, col=1)
+    fig.update_yaxes(title_text="Val 1M",    row=6, col=1)
+    fig.update_yaxes(title_text="Val 4M",    row=7, col=1)
+    fig.update_yaxes(title_text="% from Jan",row=8, col=1)
+
+    # --- Dropdown to switch candle traces ---
+    n_traces = len(fig.data)
+    n_other = n_traces - 3  # the non-candle traces, all stay visible
+    other_visible = [True] * n_other
+
+    def vis(i):
+        return [j == i for j in range(3)] + other_visible
+
+    fig.update_layout(
+        updatemenus=[{
+            "buttons": [
+                {"label": "BG avg housing",        "method": "update",
+                 "args": [{"visible": vis(0)}]},
+                {"label": "EU Property ETF",       "method": "update",
+                 "args": [{"visible": vis(1)}]},
+                {"label": "BG REIT 6A6",           "method": "update",
+                 "args": [{"visible": vis(2)}]},
+            ],
+            "direction": "down",
+            "showactive": True,
+            "x": 0.0, "xanchor": "left",
+            "y": 1.06, "yanchor": "top",
+            "bgcolor": "#fff",
+            "bordercolor": "#ccc",
+        }],
+    )
+
+    fig.update_layout(
+        title=dict(
+            text=f"<b>BG Housing — Full Indicator Suite</b>  ·  data: {source_label}",
+            x=0.02, xanchor="left",
+        ),
+        template="plotly_white",
+        height=1700,
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.005,
+                    xanchor="left", x=0.15),
+        margin=dict(l=70, r=40, t=110, b=50),
+    )
+
+    fig.write_html(out_path, include_plotlyjs="cdn", full_html=True)
 
 
 # ---------- Entry point ----------
@@ -463,31 +625,15 @@ def main():
     monthly_price_eur = monthly_price / BGN_PER_EUR
     cot_model = build_cot_model(quarterly)
 
-    # tradables
     tradables = synth_tradables(monthly_price_eur.index)
 
-    instruments = [
-        ("EU Property ETF (IPRP-like)", tradables["iprp"]),
-        ("BG REIT — 6A6 (Advance Terrafund-like)", tradables["bg_reit"]),
-        ("BG avg housing (EUR/m²) — reference", monthly_price_eur),
-    ]
-    results = [analyze_instrument(name, p, cot_model, macros)
-               for name, p in instruments]
-
-    build_html_report(results, macros, monthly_price_eur,
-                      "bg_housing_confluence.html", source_label)
+    build_combined_html(
+        cot_model, monthly_price_eur, macros, tradables,
+        "bg_housing_combined.html", source_label,
+    )
 
     print(f"Source: {source_label}")
-    print("Wrote bg_housing_confluence.html")
-    print()
-    for r in results:
-        n_buy = (r["events"]["direction"] == "BUY").sum()
-        n_sell = (r["events"]["direction"] == "SELL").sum()
-        print(f"  {r['name']}: {n_buy} BUY events, {n_sell} SELL events")
-        for _, row in r["summary"].iterrows():
-            print(f"     {row['direction']:5s}  n={int(row['n_events'])}"
-                  f"  μ12M={row['mean_12m']:+5.1f}%"
-                  f"  hit12M={row['hit_12m']:.0f}%")
+    print("Wrote bg_housing_combined.html")
 
 
 if __name__ == "__main__":
