@@ -35,13 +35,16 @@ from bg_housing_cot import (
     seasonality,
     synthesize_monthly_ohlc,
     BGN_PER_EUR,
+    VAL_ANALYSIS_1M,
     VAL_ANALYSIS_4M,
     VAL_RESCALE_MONTHS,
+    SEASONALITY_YEARS,
+    LOOKBACK_QUARTERS,
     UPPER_THRESHOLD,
     LOWER_THRESHOLD,
     VAL_UPPER,
     VAL_LOWER,
-    GREEN, RED, BLUE,
+    GREEN, RED, BLUE, YELLOW,
 )
 
 
@@ -255,6 +258,17 @@ def analyze_instrument(name, price_monthly, cot_model_q, macros):
     extremes = detect_per_indicator_extremes(price_monthly, cot_model_q, macros)
     confluence = find_confluences(extremes)
     events, summary = backtest_signals(price_monthly, confluence)
+
+    # also compute the per-instrument indicators for plotting
+    aligned = pd.concat([price_monthly.rename("p"),
+                         macros["eurusd"], macros["euribor12m"]], axis=1).dropna()
+    refs = [aligned["eurusd"], aligned["euribor12m"] + 6.0]
+    val_1m = utc_valuation(aligned["p"], refs,
+                           VAL_ANALYSIS_1M, VAL_RESCALE_MONTHS)
+    val_4m = utc_valuation(aligned["p"], refs,
+                           VAL_ANALYSIS_4M, VAL_RESCALE_MONTHS)
+    seas_avg, seas_cur = seasonality(price_monthly, SEASONALITY_YEARS)
+
     return {
         "name": name,
         "price": price_monthly,
@@ -262,6 +276,11 @@ def analyze_instrument(name, price_monthly, cot_model_q, macros):
         "confluence": confluence,
         "events": events,
         "summary": summary,
+        "val_1m": val_1m,
+        "val_4m": val_4m,
+        "cot": cot_model_q,
+        "seasonal_avg": seas_avg,
+        "seasonal_cur": seas_cur,
     }
 
 
@@ -309,13 +328,30 @@ def _summary_html_table(summary):
             f"{base:+.1f}%</p>")
 
 
-def _make_instrument_figure(name, ohlc, val_4m_series, events):
+def _make_instrument_figure(name, result):
+    ohlc = synthesize_monthly_ohlc(result["price"])
+    cot = result["cot"]
+    val_1m = result["val_1m"]
+    val_4m = result["val_4m"]
+    seas_avg = result["seasonal_avg"]
+    seas_cur = result["seasonal_cur"]
+    events = result["events"]
+
     fig = make_subplots(
-        rows=2, cols=1, shared_xaxes=True, row_heights=[0.65, 0.35],
-        vertical_spacing=0.05,
-        subplot_titles=(f"{name} — monthly candles with confluence markers",
-                        "Valuation 4M (per-instrument vs EUR/USD + EURIBOR)"),
+        rows=5, cols=1, shared_xaxes=False,
+        row_heights=[0.32, 0.20, 0.14, 0.14, 0.20],
+        vertical_spacing=0.045,
+        subplot_titles=(
+            f"{name} — monthly candles + confluence markers",
+            f"COT Index (BG positioning, {LOOKBACK_QUARTERS}Q lookback) — "
+            "Commercials / Non-com / Retailers",
+            "Valuation 1M (vs EUR/USD + EURIBOR12M, 1-mo / 12-mo rescale)",
+            "Valuation 4M (vs EUR/USD + EURIBOR12M, 4-mo / 12-mo rescale)",
+            f"Seasonality — avg last {SEASONALITY_YEARS} yrs vs current year",
+        ),
     )
+
+    # --- 1) Candles + markers ---
     fig.add_trace(go.Candlestick(
         x=ohlc.index, open=ohlc["open"], high=ohlc["high"],
         low=ohlc["low"], close=ohlc["close"],
@@ -323,58 +359,124 @@ def _make_instrument_figure(name, ohlc, val_4m_series, events):
         decreasing_line_color=RED,   decreasing_fillcolor=RED,
         name=name, showlegend=False,
     ), row=1, col=1)
-
     buys  = events[events["direction"] == "BUY"]
     sells = events[events["direction"] == "SELL"]
     if len(buys):
-        y = [float(ohlc.loc[d, "low"]) * 0.97 for d in buys["date"]]
+        y = [float(ohlc.loc[d, "low"]) * 0.96 for d in buys["date"]]
         fig.add_trace(go.Scatter(
             x=list(buys["date"]), y=y, mode="markers",
-            marker=dict(symbol="triangle-up", size=14, color=GREEN,
+            marker=dict(symbol="triangle-up", size=13, color=GREEN,
                         line=dict(color="#222", width=1)),
-            name="BUY confluence",
+            name="BUY conf",
             hovertemplate="BUY %{x|%Y-%m}<extra></extra>",
         ), row=1, col=1)
     if len(sells):
-        y = [float(ohlc.loc[d, "high"]) * 1.03 for d in sells["date"]]
+        y = [float(ohlc.loc[d, "high"]) * 1.04 for d in sells["date"]]
         fig.add_trace(go.Scatter(
             x=list(sells["date"]), y=y, mode="markers",
-            marker=dict(symbol="triangle-down", size=14, color=RED,
+            marker=dict(symbol="triangle-down", size=13, color=RED,
                         line=dict(color="#222", width=1)),
-            name="SELL confluence",
+            name="SELL conf",
             hovertemplate="SELL %{x|%Y-%m}<extra></extra>",
         ), row=1, col=1)
 
-    s = val_4m_series.dropna()
+    # --- 2) COT (3 legs combined) ---
+    for label, col, color in [
+        ("Commercials",      "commercials",    GREEN),
+        ("Non-commercials",  "noncommercials", YELLOW),
+        ("Retailers",        "retailers",      RED),
+    ]:
+        s = cot[col].dropna()
+        fig.add_trace(go.Scatter(
+            x=s.index, y=s.values, mode="lines", name=label,
+            line=dict(color=color, width=1.4),
+            hovertemplate=label + ": %{y:.0f}<extra></extra>",
+            showlegend=(name == "EU Property ETF (IPRP-like)"),
+            legendgroup="cot", legendgrouptitle_text="COT legs",
+        ), row=2, col=1)
+    fig.add_hline(y=UPPER_THRESHOLD, line=dict(color="#888", width=1, dash="dash"), row=2, col=1)
+    fig.add_hline(y=LOWER_THRESHOLD, line=dict(color="#888", width=1, dash="dash"), row=2, col=1)
+    fig.add_hrect(y0=UPPER_THRESHOLD, y1=100, fillcolor=RED, opacity=0.05,
+                  line_width=0, row=2, col=1)
+    fig.add_hrect(y0=0, y1=LOWER_THRESHOLD, fillcolor=GREEN, opacity=0.05,
+                  line_width=0, row=2, col=1)
+    fig.update_yaxes(range=[-5, 105], row=2, col=1)
+
+    # --- 3) Val 1M ---
+    s = val_1m.dropna()
     fig.add_trace(go.Scatter(
-        x=s.index, y=s.values, mode="lines", line=dict(color=BLUE, width=1.5),
-        showlegend=False,
-    ), row=2, col=1)
-    fig.add_hline(y=VAL_UPPER, line=dict(color=RED, width=1, dash="dash"), row=2, col=1)
-    fig.add_hline(y=VAL_LOWER, line=dict(color=GREEN, width=1, dash="dash"), row=2, col=1)
-    fig.add_hline(y=0, line=dict(color="#888", width=0.7), row=2, col=1)
-    fig.update_yaxes(range=[-110, 110], row=2, col=1)
+        x=s.index, y=s.values, mode="lines", showlegend=False,
+        line=dict(color="#a040ff", width=1.5),
+        hovertemplate="Val 1M: %{y:.1f}<extra></extra>",
+    ), row=3, col=1)
+    fig.add_hline(y=VAL_UPPER, line=dict(color=RED,   width=1, dash="dash"), row=3, col=1)
+    fig.add_hline(y=VAL_LOWER, line=dict(color=GREEN, width=1, dash="dash"), row=3, col=1)
+    fig.add_hline(y=0, line=dict(color="#888", width=0.7), row=3, col=1)
+    fig.update_yaxes(range=[-110, 110], row=3, col=1)
+
+    # --- 4) Val 4M ---
+    s = val_4m.dropna()
+    fig.add_trace(go.Scatter(
+        x=s.index, y=s.values, mode="lines", showlegend=False,
+        line=dict(color=BLUE, width=1.5),
+        hovertemplate="Val 4M: %{y:.1f}<extra></extra>",
+    ), row=4, col=1)
+    fig.add_hline(y=VAL_UPPER, line=dict(color=RED,   width=1, dash="dash"), row=4, col=1)
+    fig.add_hline(y=VAL_LOWER, line=dict(color=GREEN, width=1, dash="dash"), row=4, col=1)
+    fig.add_hline(y=0, line=dict(color="#888", width=0.7), row=4, col=1)
+    fig.update_yaxes(range=[-110, 110], row=4, col=1)
+
+    # --- 5) Seasonality ---
+    if len(seas_avg):
+        fig.add_trace(go.Scatter(
+            x=seas_avg.index, y=seas_avg.values, mode="lines+markers",
+            name=f"Avg last {SEASONALITY_YEARS} yrs",
+            line=dict(color="#a040ff", width=2),
+            hovertemplate="M%{x}: %{y:+.1f}%<extra></extra>",
+            showlegend=(name == "EU Property ETF (IPRP-like)"),
+            legendgroup="seas", legendgrouptitle_text="Seasonality",
+        ), row=5, col=1)
+    if len(seas_cur):
+        fig.add_trace(go.Scatter(
+            x=seas_cur.index, y=seas_cur.values, mode="lines+markers",
+            name="Current year",
+            line=dict(color=BLUE, width=2, dash="dot"),
+            hovertemplate="M%{x}: %{y:+.1f}%<extra></extra>",
+            showlegend=(name == "EU Property ETF (IPRP-like)"),
+            legendgroup="seas",
+        ), row=5, col=1)
+    fig.update_xaxes(
+        tickmode="array",
+        tickvals=list(range(1, 13)),
+        ticktext=["Jan","Feb","Mar","Apr","May","Jun",
+                  "Jul","Aug","Sep","Oct","Nov","Dec"],
+        row=5, col=1,
+    )
+
     fig.update_xaxes(rangeslider_visible=False, row=1, col=1)
-    fig.update_layout(template="plotly_white", height=620,
-                      margin=dict(l=50, r=30, t=70, b=40),
-                      hovermode="x unified")
+    fig.update_yaxes(title_text="Price", row=1, col=1)
+    fig.update_yaxes(title_text="COT", row=2, col=1)
+    fig.update_yaxes(title_text="Val 1M", row=3, col=1)
+    fig.update_yaxes(title_text="Val 4M", row=4, col=1)
+    fig.update_yaxes(title_text="% from Jan", row=5, col=1)
+    fig.update_xaxes(title_text="Month", row=5, col=1)
+
+    fig.update_layout(
+        template="plotly_white", height=1180,
+        margin=dict(l=55, r=30, t=80, b=40),
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.005,
+                    xanchor="left", x=0),
+    )
     return fig
 
 
 def build_html_report(results, macros, monthly_price_bg, out_path, source_label):
     sections = []
     for r in results:
-        # per-instrument 4M valuation (recompute for plot)
-        aligned = pd.concat([r["price"].rename("p"),
-                             macros["eurusd"], macros["euribor12m"]],
-                            axis=1).dropna()
-        val_4m = utc_valuation(aligned["p"],
-                               [aligned["eurusd"], aligned["euribor12m"] + 6.0],
-                               VAL_ANALYSIS_4M, VAL_RESCALE_MONTHS)
-        ohlc = synthesize_monthly_ohlc(r["price"])
-        fig = _make_instrument_figure(r["name"], ohlc, val_4m, r["events"])
+        fig = _make_instrument_figure(r["name"], r)
         chart_div = fig.to_html(include_plotlyjs=False, full_html=False,
-                                div_id=f"chart_{r['name'].replace(' ', '_')}")
+                                div_id=f"chart_{abs(hash(r['name']))}")
 
         sections.append(f"""
 <section class='instrument'>
