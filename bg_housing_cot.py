@@ -299,13 +299,14 @@ def _draw_candles(ax, ohlc: pd.DataFrame, width_days: float = 22):
 
 def plot_price_chart(monthly: pd.DataFrame, out_path: str, source_label: str):
     """
-    Two-pane price view of BG average housing price (BGN / m²):
-      1) Monthly OHLC candles + 3M & 12M moving averages.
-      2) Weekly OHLC candles (built from cubic-spline interpolation of the
-         monthly series) + 13W moving average.
+    Three-pane price view of BG average housing price (BGN / m²):
+      1) Monthly OHLC candles + 3M & 12M MAs + real quarterly anchor markers.
+      2) Weekly OHLC candles (cubic-spline interp of monthly) + 13W MA.
+      3) YoY % change pane (12M return) — what real-estate analysts actually
+         care about.
 
-    HONESTY: НСИ avg price is QUARTERLY-real. Monthly and weekly granularity
-    here is synthetic interpolation around quarterly anchors.
+    HONESTY: НСИ avg price is QUARTERLY-real. Anything below quarterly is
+    synthetic interpolation around real quarterly anchors.
     """
     price = monthly["avg_price_sqm"]
     m_ohlc = synthesize_monthly_ohlc(price, vol_pct=0.010)
@@ -316,24 +317,32 @@ def plot_price_chart(monthly: pd.DataFrame, out_path: str, source_label: str):
     ma_m_long = price.rolling(window=12, min_periods=1).mean()
     ma_w = weekly_close.rolling(window=13, min_periods=1).mean()
 
-    fig, axes = plt.subplots(2, 1, figsize=(15, 10), sharex=True,
-                             gridspec_kw={"height_ratios": [3, 2]})
+    # Real quarterly anchors = the QS-resampled close from the monthly series.
+    # In real-data mode these are the actual НСИ prints.
+    quarterly_anchors = price.resample("QS").last()
+    yoy = price.pct_change(periods=12) * 100
+
+    fig, axes = plt.subplots(3, 1, figsize=(15, 12), sharex=True,
+                             gridspec_kw={"height_ratios": [3, 2, 1.5]})
     fig.suptitle(
         "Bulgarian Housing — Average Price (BGN / m²)  ·  Sofia anchor  ·  "
         f"data: {source_label}",
         fontsize=12, fontweight="bold", y=0.995,
     )
 
-    # --- Monthly candles + MAs ---
+    # --- Monthly candles + MAs + quarterly anchors ---
     ax = axes[0]
     _draw_candles(ax, m_ohlc, width_days=22)
     ax.plot(ma_m_short.index, ma_m_short.values, color="#ff9500", lw=1.4,
             label="3M MA", zorder=4)
     ax.plot(ma_m_long.index, ma_m_long.values, color="#1f77b4", lw=1.6,
             label="12M MA", zorder=4)
+    ax.scatter(quarterly_anchors.index, quarterly_anchors.values,
+               color="#000", s=28, marker="D", zorder=5,
+               label="Real quarterly anchor (НСИ)")
     ax.set_title(
-        "Monthly candles + moving averages — monthly granularity is "
-        "SYNTHETIC (НСИ publishes quarterly); ±1.0% intra-month range",
+        "Monthly candles + MAs + real quarterly anchors (black ◆) — "
+        "monthly granularity is SYNTHETIC (interp around real anchors)",
         loc="left", fontsize=10, fontweight="bold",
     )
     ax.set_ylabel("BGN / m²")
@@ -357,12 +366,34 @@ def plot_price_chart(monthly: pd.DataFrame, out_path: str, source_label: str):
              label="13W MA", zorder=4)
     ax2.set_title(
         "Weekly candles + 13W MA — fully SYNTHETIC (cubic-spline "
-        "interpolation of monthly synthetic; ±0.4% intra-week range)",
+        "interpolation of monthly; ±0.4% intra-week range)",
         loc="left", fontsize=10, fontweight="bold",
     )
     ax2.set_ylabel("BGN / m²")
     ax2.grid(True, alpha=0.25)
     ax2.legend(loc="upper left", fontsize=9, framealpha=0.9)
+
+    # --- YoY % change ---
+    ax3 = axes[2]
+    ax3.fill_between(yoy.index, 0, yoy.values,
+                     where=(yoy.values >= 0), color="#34c759", alpha=0.35,
+                     interpolate=True)
+    ax3.fill_between(yoy.index, 0, yoy.values,
+                     where=(yoy.values < 0), color="#ff3b30", alpha=0.35,
+                     interpolate=True)
+    ax3.plot(yoy.index, yoy.values, color="#222", lw=1.2)
+    ax3.axhline(0, color="#888", lw=0.8)
+    last_yoy = float(yoy.dropna().iloc[-1])
+    ax3.annotate(
+        f"{last_yoy:+.1f}%",
+        xy=(yoy.index[-1], last_yoy), xytext=(8, 0), textcoords="offset points",
+        va="center", fontsize=9, fontweight="bold",
+        color=("#34c759" if last_yoy >= 0 else "#ff3b30"),
+    )
+    ax3.set_title("YoY price change (12M)", loc="left",
+                  fontsize=10, fontweight="bold")
+    ax3.set_ylabel("%")
+    ax3.grid(True, alpha=0.25)
 
     for ax_ in axes:
         ax_.xaxis.set_major_locator(mdates.YearLocator())
