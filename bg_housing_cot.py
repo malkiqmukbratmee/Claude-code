@@ -107,7 +107,11 @@ def synthetic_demo_data() -> tuple:
     """
     rng = np.random.default_rng(7)
 
-    # --- Monthly series (mortgage stock + NFC RE loans, EUR bn) ---
+    # --- Monthly series ---
+    # mortgage_stock + nfc_loans_stock are real-monthly (БНБ).
+    # avg_price_sqm is calibrated to НСИ avg residential price per m²,
+    # but НСИ only publishes it QUARTERLY — the monthly granularity here
+    # is SYNTHETIC interpolation around real quarterly anchors.
     months = pd.date_range(start="2015-01-01", end="2026-04-01", freq="MS")
     m = len(months)
     tm = np.arange(m)
@@ -117,8 +121,23 @@ def synthetic_demo_data() -> tuple:
     # NFC real-estate loan stock
     nfc_stock = 1.4 + tm * 0.018 + 0.35 * np.sin(2 * np.pi * tm / 36)
     nfc_stock += rng.normal(0, 0.03, m).cumsum() * 0.05
+    # Average housing price (BGN per m²) — anchors:
+    #   2015 Sofia avg ≈ 1,500 BGN/m²
+    #   2025 Sofia avg ≈ 3,500 BGN/m²
+    # Same shape as HPI (flat 2015-19, boom 2020-25).
+    excess_m = np.maximum(tm - 60, 0).astype(float)  # boom starts ~2020
+    avg_price = np.where(
+        tm < 60,
+        1500 + tm * 6.0,
+        1860 + (excess_m ** 1.45) * 4.2,
+    )
+    avg_price += rng.normal(0, 18, m).cumsum() * 0.10
     monthly = pd.DataFrame(
-        {"mortgage_stock": mortgage_stock, "nfc_loans_stock": nfc_stock},
+        {
+            "mortgage_stock": mortgage_stock,
+            "nfc_loans_stock": nfc_stock,
+            "avg_price_sqm": avg_price,
+        },
         index=months,
     )
 
@@ -280,58 +299,70 @@ def _draw_candles(ax, ohlc: pd.DataFrame, width_days: float = 22):
 
 def plot_price_chart(monthly: pd.DataFrame, out_path: str, source_label: str):
     """
-    Two-pane price view:
-      1) Monthly OHLC candles of БНБ mortgage stock (proxy price for the housing
-         market). H/L is synthesized via calibrated intra-month volatility.
-      2) Weekly cubic-spline interpolation of the same monthly series (visual
-         only; no real weekly data exists for BG housing).
-    """
-    ohlc = synthesize_monthly_ohlc(monthly["mortgage_stock"])
-    weekly = weekly_interpolate(monthly["mortgage_stock"])
+    Two-pane price view of BG average housing price (BGN / m²):
+      1) Monthly OHLC candles + 3M & 12M moving averages.
+      2) Weekly OHLC candles (built from cubic-spline interpolation of the
+         monthly series) + 13W moving average.
 
-    fig, axes = plt.subplots(2, 1, figsize=(15, 9), sharex=True,
+    HONESTY: НСИ avg price is QUARTERLY-real. Monthly and weekly granularity
+    here is synthetic interpolation around quarterly anchors.
+    """
+    price = monthly["avg_price_sqm"]
+    m_ohlc = synthesize_monthly_ohlc(price, vol_pct=0.010)
+    weekly_close = weekly_interpolate(price)
+    w_ohlc = synthesize_monthly_ohlc(weekly_close, vol_pct=0.004, seed=23)
+
+    ma_m_short = price.rolling(window=3, min_periods=1).mean()
+    ma_m_long = price.rolling(window=12, min_periods=1).mean()
+    ma_w = weekly_close.rolling(window=13, min_periods=1).mean()
+
+    fig, axes = plt.subplots(2, 1, figsize=(15, 10), sharex=True,
                              gridspec_kw={"height_ratios": [3, 2]})
     fig.suptitle(
-        "Bulgarian Housing — Price-style View  ·  Mortgage Stock (БНБ) as "
-        f"market proxy  ·  data: {source_label}",
+        "Bulgarian Housing — Average Price (BGN / m²)  ·  Sofia anchor  ·  "
+        f"data: {source_label}",
         fontsize=12, fontweight="bold", y=0.995,
     )
 
-    # --- Candles ---
+    # --- Monthly candles + MAs ---
     ax = axes[0]
-    _draw_candles(ax, ohlc, width_days=22)
+    _draw_candles(ax, m_ohlc, width_days=22)
+    ax.plot(ma_m_short.index, ma_m_short.values, color="#ff9500", lw=1.4,
+            label="3M MA", zorder=4)
+    ax.plot(ma_m_long.index, ma_m_long.values, color="#1f77b4", lw=1.6,
+            label="12M MA", zorder=4)
     ax.set_title(
-        "Monthly OHLC candles — close is real БНБ month-end stock; "
-        "H / L is synthetic intra-month range (±1.2%)",
+        "Monthly candles + moving averages — monthly granularity is "
+        "SYNTHETIC (НСИ publishes quarterly); ±1.0% intra-month range",
         loc="left", fontsize=10, fontweight="bold",
     )
-    ax.set_ylabel("Mortgage stock (EUR bn)")
+    ax.set_ylabel("BGN / m²")
     ax.grid(True, alpha=0.25)
-    last_c = float(ohlc["close"].iloc[-1])
-    last_d = ohlc.index[-1]
+    ax.legend(loc="upper left", fontsize=9, framealpha=0.9)
+    last_c = float(m_ohlc["close"].iloc[-1])
+    last_d = m_ohlc.index[-1]
     ax.annotate(
-        f"{last_c:,.2f}",
+        f"{last_c:,.0f}",
         xy=(last_d, last_c), xytext=(8, 0), textcoords="offset points",
         va="center", fontsize=9, fontweight="bold",
-        color=("#34c759" if ohlc["close"].iloc[-1] >= ohlc["open"].iloc[-1] else "#ff3b30"),
+        color=("#34c759" if m_ohlc["close"].iloc[-1] >= m_ohlc["open"].iloc[-1] else "#ff3b30"),
     )
     ax.set_xlim(monthly.index.min() - pd.Timedelta(days=20),
                 monthly.index.max() + pd.Timedelta(days=40))
 
-    # --- Weekly subchart ---
+    # --- Weekly candles + MA ---
     ax2 = axes[1]
-    ax2.plot(weekly.index, weekly.values, color="#1f77b4", lw=1.3,
-             label="Weekly interp. (synthetic)")
-    ax2.scatter(monthly.index, monthly["mortgage_stock"].values,
-                color="#1f77b4", s=14, zorder=4, label="Monthly close (real)")
+    _draw_candles(ax2, w_ohlc, width_days=4.5)
+    ax2.plot(ma_w.index, ma_w.values, color="#1f77b4", lw=1.4,
+             label="13W MA", zorder=4)
     ax2.set_title(
-        "Weekly subchart — cubic-spline interpolation of monthly closes "
-        "(no real weekly data exists)",
+        "Weekly candles + 13W MA — fully SYNTHETIC (cubic-spline "
+        "interpolation of monthly synthetic; ±0.4% intra-week range)",
         loc="left", fontsize=10, fontweight="bold",
     )
-    ax2.set_ylabel("EUR bn")
+    ax2.set_ylabel("BGN / m²")
     ax2.grid(True, alpha=0.25)
-    ax2.legend(loc="upper left", fontsize=8, framealpha=0.9)
+    ax2.legend(loc="upper left", fontsize=9, framealpha=0.9)
 
     for ax_ in axes:
         ax_.xaxis.set_major_locator(mdates.YearLocator())
@@ -426,15 +457,15 @@ def main():
     plot_price_chart(monthly, out_price_png, source_label)
 
     last_q = model.dropna().tail(4)
-    last_m = synthesize_monthly_ohlc(monthly["mortgage_stock"]).tail(6)
+    last_m = synthesize_monthly_ohlc(monthly["avg_price_sqm"], vol_pct=0.010).tail(6)
     print(f"Source: {source_label}")
     print(f"Wrote {out_cot_csv}, {out_monthly_csv}, {out_cot_png}, {out_price_png}")
     print()
     print("Last 4 quarters (COT model):")
     print(last_q.round(1).to_string())
     print()
-    print("Last 6 monthly OHLC candles (mortgage stock, EUR bn):")
-    print(last_m.round(3).to_string())
+    print("Last 6 monthly OHLC candles (avg housing price, BGN / m²):")
+    print(last_m.round(0).to_string())
 
 
 if __name__ == "__main__":
