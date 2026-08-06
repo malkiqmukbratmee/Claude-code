@@ -356,3 +356,19 @@ P(the session's pullback comes down AT LEAST to the level):
 | 6+ | 5.2% |
 
 Mean 1.85, median 1. P(>=1) 69.1%, P(>=2) 47.7%, P(>=3) 30.7%. Given at least one touch: P(another) 68.9%, mean 2.67 touches total.
+
+## Does the edge weaken with repeated touches? (all 3,683 sessions)
+
+Outcome by total touch count and the realtime view (being at the Nth touch):
+
+| Touches (total) | n | Close beyond edge | Close inside | Close opposite |
+|---|---|---|---|---|
+| 0 | 645 | 100% (definitional) | 0% | 0% |
+| 1 | 977 | 46.0% | 29.1% | 25.0% |
+| 2 | 738 | 48.1% | 30.9% | 21.0% |
+| 3 | 550 | 48.2% | 36.7% | 15.1% |
+| 4 | 331 | 48.9% | 38.7% | 12.4% |
+| 5 | 222 | 47.3% | 42.3% | 10.4% |
+| 6+ | 220 | 49.5% | 35.9% | 14.5% |
+
+Realtime (at the Nth touch, future unknown): P(close beyond edge) is FLAT at 47–49% for every N from 1 to 7. Touch count carries no incremental information. The informative event is the FIRST touch (drops certainty to a coin flip); repeated touches actually LOWER the reversal probability (25% at one touch -> 10–12% at 4–5 touches) and shift mass toward inside-range chop closes. The 'it will not hold' signal remains the 15-minute close back inside the range, not any touch count.
