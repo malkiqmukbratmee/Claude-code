@@ -296,3 +296,37 @@ Among continuations where the pre-HH/LL pullback floor stayed beyond the broken 
 | 50-75% into (mid zone)          | 11.6%               |
 | 75-100% into                    | 5.6%                |
 | beyond opposite side (>100%)    | 7.6%                |
+
+## Fine-grained: where ABOVE the edge does the floor land (holders, before new HH/LL)
+
+Monotonically declining — the modal zone is 0-10% of the range beyond the edge; no secondary peak at 25%.
+
+### LONG (n=1,107)
+
+|        | share   |
+|:-------|:--------|
+| 0-5%   | 16.1%   |
+| 5-10%  | 17.5%   |
+| 10-15% | 13.6%   |
+| 15-20% | 9.9%    |
+| 20-25% | 9.4%    |
+| 25-30% | 6.5%    |
+| 30-40% | 10.0%   |
+| 40-50% | 5.2%    |
+| 50-75% | 6.9%    |
+| >75%   | 4.8%    |
+
+### SHORT (n=991)
+
+|        | share   |
+|:-------|:--------|
+| 0-5%   | 12.2%   |
+| 5-10%  | 14.9%   |
+| 10-15% | 12.2%   |
+| 15-20% | 10.0%   |
+| 20-25% | 9.2%    |
+| 25-30% | 6.9%    |
+| 30-40% | 9.9%    |
+| 40-50% | 7.2%    |
+| 50-75% | 10.9%   |
+| >75%   | 6.7%    |
