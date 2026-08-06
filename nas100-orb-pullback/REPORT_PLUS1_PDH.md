@@ -215,3 +215,30 @@ Of the 3,683 events, 466 fell on +1% days and 494 on -1% days. On those days the
 ### Against-day acceptances (n=131)
 
 P(retest) 100%, P(opposite side) 100%, median MAE 343% of the range — on a true directional day the against-day acceptance fails essentially always (by construction it must traverse back, but the magnitude is the point).
+
+## Failed acceptance: 15m close back inside the range — reversal / double distribution odds
+
+A later 15-min candle closes back INSIDE the range after 2,616 of 3,683 acceptances (71.0% [69.5–72.5]).
+
+### LONG acceptance fails back inside (n=1,376, 69.5% of longs)
+
+- Opposite-side acceptance later (**double distribution**): 34.7% [32.2–37.2]
+- Re-acceptance of the SAME side later: 71.1% [68.6–73.4]
+- First event after the fail: same-side re-break 66.7% / opposite break 23.0% / chop till close 10.2%
+- Day closes AGAINST the original breakout (vs 09:30 open): 34.9% [32.4–37.4]
+- 16:00 close beyond the OPPOSITE edge: 21.1% [19.1–23.4]
+- 16:00 close back beyond the ORIGINAL edge: 42.5% [39.9–45.1]
+
+### SHORT acceptance fails back inside (n=1,240, 72.9% of shorts)
+
+- Opposite-side acceptance later (**double distribution**): 35.2% [32.6–37.9]
+- Re-acceptance of the SAME side later: 66.6% [63.9–69.2]
+- First event after the fail: same-side re-break 62.7% / opposite break 24.7% / chop till close 12.7%
+- Day closes AGAINST the original breakout (vs 09:30 open): 38.6% [36.0–41.4]
+- 16:00 close beyond the OPPOSITE edge: 22.3% [20.0–24.7]
+- 16:00 close back beyond the ORIGINAL edge: 36.2% [33.6–38.9]
+
+### Once the double distribution confirms (opposite acceptance, n=913)
+
+- Day closes against the original direction: 77.5% [74.7–80.1]
+- Day closes beyond the opposite edge: 62.1% [58.9–65.2]
