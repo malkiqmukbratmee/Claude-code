@@ -330,3 +330,15 @@ Monotonically declining — the modal zone is 0-10% of the range beyond the edge
 | 40-50% | 7.2%    |
 | 50-75% | 10.9%   |
 | >75%   | 6.7%    |
+
+## Limit-fill probabilities above the edge (sessions closing beyond the broken edge, n=2090)
+
+P(the session's pullback comes down AT LEAST to the level):
+
+| Level              | Fill probability [95% CI]   |
+|:-------------------|:----------------------------|
+| edge +50% of range | 96.1% [95.2–96.8]           |
+| edge +35%          | 93.0% [91.8–94.0]           |
+| edge +25%          | 90.0% [88.6–91.2]           |
+| edge +10%          | 80.7% [79.0–82.4]           |
+| the edge itself    | 69.1% [67.1–71.1]           |
