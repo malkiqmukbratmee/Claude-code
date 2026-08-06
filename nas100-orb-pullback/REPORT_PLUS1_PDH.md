@@ -372,3 +372,17 @@ Outcome by total touch count and the realtime view (being at the Nth touch):
 | 6+ | 220 | 49.5% | 35.9% | 14.5% |
 
 Realtime (at the Nth touch, future unknown): P(close beyond edge) is FLAT at 47–49% for every N from 1 to 7. Touch count carries no incremental information. The informative event is the FIRST touch (drops certainty to a coin flip); repeated touches actually LOWER the reversal probability (25% at one touch -> 10–12% at 4–5 touches) and shift mass toward inside-range chop closes. The 'it will not hold' signal remains the 15-minute close back inside the range, not any touch count.
+
+### Same question restricted to touches before 11:00 ET (18:00 Bulgarian)
+
+Acceptance before 11:00 ET, touches counted only up to 11:00 ET, outcome still the 16:00 ET close (n=2,442):
+
+| Early touches (<=11:00 ET) | n | Close beyond edge | Close inside | Close opposite |
+|---|---|---|---|---|
+| 0 | 915 | 72.3% | 17.3% | 10.4% |
+| 1 | 1,154 | 47.8% | 29.7% | 22.4% |
+| 2 | 331 | 52.3% | 26.3% | 21.5% |
+| 3 | 34 | 32.4% | 32.4% | 35.3% |
+| 4+ | 8 | 37.5% | 12.5% | 50.0% |
+
+Within the first ~45 minutes, a THIRD separate touch is the first point where the odds flip (reversal 35–50% vs continuation ~33%), but only ~1.7% of sessions ever get there and the sample is too small for statistical certainty (Wilson CI on touch-3 continuation: roughly 20–48%). One or two early touches carry no warning at all.
