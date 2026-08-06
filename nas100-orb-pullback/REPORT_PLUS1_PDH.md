@@ -193,3 +193,25 @@ Delayed-continuation subset (pullback-first scenario):
 
 - Held beyond the ORB low: 13.5% (median 1.70 pts / 15.1% of range beyond the edge)
 - Re-entered the range first: 84.8% (median depth inside 4.90 pts / 39.2% of range)
+
+## Clear directional days (session open->close beyond +/-1%)
+
+Of the 3,683 events, 466 fell on +1% days and 494 on -1% days. On those days the ORB acceptance pointed WITH the day 86.4% of the time (n=829).
+
+### Aligned acceptances on directional days — pullback after the acceptance close
+
+|     |   Pullback (pts) |   Pullback (% of ORB range) |   Pullback (% of price) |
+|:----|-----------------:|----------------------------:|------------------------:|
+| p10 |             0.50 |                        4.04 |                    0.03 |
+| p25 |             2.00 |                       13.24 |                    0.08 |
+| p50 |             5.40 |                       30.06 |                    0.21 |
+| p75 |            11.50 |                       55.43 |                    0.43 |
+| p90 |            22.44 |                       94.70 |                    0.81 |
+
+- P(retest of edge) 55.7% | P(re-entry) 54.4% | P(mid) 15.0% | P(opposite) 4.8% | P(close back inside) 2.3%
+- long: held above ORB high all day 46.6%; floor beyond edge p25 1.0 / p50 2.5 / p75 5.6 pts (7/16/35% of range)
+- short: held below ORB low all day 42.1%; floor beyond edge p25 1.2 / p50 2.9 / p75 6.0 pts (8/16/40% of range)
+
+### Against-day acceptances (n=131)
+
+P(retest) 100%, P(opposite side) 100%, median MAE 343% of the range — on a true directional day the against-day acceptance fails essentially always (by construction it must traverse back, but the magnitude is the point).
