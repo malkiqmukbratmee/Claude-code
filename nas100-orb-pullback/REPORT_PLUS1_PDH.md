@@ -79,3 +79,79 @@ Same 2005–2020 sample; n=3,683 events (1,981 long, 1,702 short). All distances
 
 - re-entered the range before reaching the target: **47.3%** [CI 42.7–51.9]
 - went almost straight (pullback <= 10% of range): **29.6%** [CI 25.5–34.0]
+
+## Distance HELD beyond the broken edge (holders only)
+
+How far ABOVE the ORB high (longs) / BELOW the ORB low (shorts) the pullback bottoms out, for the events where it does NOT come back to the edge.
+
+### LONG — above ORB high: +1 candle low
+
+Holds beyond the edge in 48.2% of cases (n=955 of 1,981).
+
+|     |   Distance beyond edge (pts) |   Distance (% of ORB range) |
+|:----|-----------------------------:|----------------------------:|
+| p10 |                         0.50 |                        2.75 |
+| p25 |                         1.00 |                        6.64 |
+| p50 |                         2.10 |                       15.00 |
+| p75 |                         4.70 |                       29.54 |
+| p90 |                         7.80 |                       51.27 |
+
+### LONG — above ORB high: deepest pullback before PDH/PDL touch (gap days excluded)
+
+Holds beyond the edge in 47.7% of cases (n=200 of 419).
+
+|     |   Distance beyond edge (pts) |   Distance (% of ORB range) |
+|:----|-----------------------------:|----------------------------:|
+| p10 |                         0.30 |                        2.73 |
+| p25 |                         0.80 |                        6.17 |
+| p50 |                         2.30 |                       14.73 |
+| p75 |                         4.30 |                       29.89 |
+| p90 |                         8.73 |                       54.71 |
+
+### LONG — above ORB high: whole-day pullback floor (acceptance close to 16:00)
+
+Holds beyond the edge in 18.3% of cases (n=362 of 1,981).
+
+|     |   Distance beyond edge (pts) |   Distance (% of ORB range) |
+|:----|-----------------------------:|----------------------------:|
+| p10 |                         0.50 |                        2.90 |
+| p25 |                         0.92 |                        5.96 |
+| p50 |                         2.00 |                       13.56 |
+| p75 |                         4.30 |                       28.89 |
+| p90 |                         7.68 |                       51.20 |
+
+### SHORT — below ORB low: +1 candle low
+
+Holds beyond the edge in 47.7% of cases (n=812 of 1,702).
+
+|     |   Distance beyond edge (pts) |   Distance (% of ORB range) |
+|:----|-----------------------------:|----------------------------:|
+| p10 |                         0.50 |                        3.95 |
+| p25 |                         1.20 |                        8.33 |
+| p50 |                         2.70 |                       18.11 |
+| p75 |                         5.50 |                       35.16 |
+| p90 |                         9.50 |                       58.73 |
+
+### SHORT — below ORB low: deepest pullback before PDH/PDL touch (gap days excluded)
+
+Holds beyond the edge in 48.7% of cases (n=217 of 446).
+
+|     |   Distance beyond edge (pts) |   Distance (% of ORB range) |
+|:----|-----------------------------:|----------------------------:|
+| p10 |                         0.60 |                        4.46 |
+| p25 |                         1.20 |                       10.56 |
+| p50 |                         2.70 |                       21.19 |
+| p75 |                         5.30 |                       38.95 |
+| p90 |                        10.00 |                       60.32 |
+
+### SHORT — below ORB low: whole-day pullback floor (acceptance close to 16:00)
+
+Holds beyond the edge in 16.6% of cases (n=283 of 1,702).
+
+|     |   Distance beyond edge (pts) |   Distance (% of ORB range) |
+|:----|-----------------------------:|----------------------------:|
+| p10 |                         0.50 |                        3.35 |
+| p25 |                         1.20 |                        7.71 |
+| p50 |                         2.70 |                       16.57 |
+| p75 |                         5.25 |                       37.12 |
+| p90 |                         9.20 |                       61.89 |
