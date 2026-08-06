@@ -386,3 +386,19 @@ Acceptance before 11:00 ET, touches counted only up to 11:00 ET, outcome still t
 | 4+ | 8 | 37.5% | 12.5% | 50.0% |
 
 Within the first ~45 minutes, a THIRD separate touch is the first point where the odds flip (reversal 35–50% vs continuation ~33%), but only ~1.7% of sessions ever get there and the sample is too small for statistical certainty (Wilson CI on touch-3 continuation: roughly 20–48%). One or two early touches carry no warning at all.
+
+## Success rate by deepest-pullback zone (all 3,683 sessions)
+
+| Deepest pullback zone | n | Close beyond edge | Close in direction | Reversal |
+|---|---|---|---|---|
+| holds >50% above edge | 83 | 100% | 100% | 0% |
+| holds 25-50% above | 129 | 100% | 100% | 0% |
+| holds 10-25% above | 191 | 100% | 100% | 0% |
+| holds 0-10% above (no touch) | 276 | 100% | 100% | 0% |
+| touch edge -> 10% inside | 237 | 97% [94-99] | 100% | 0% |
+| 10-25% inside | 358 | 89% [85-91] | 99% | 0% |
+| 25-50% inside | 488 | 71% [67-75] | 96% | 0% |
+| 50-100% inside | 789 | 46% [42-49] | 81% | 0% |
+| crossed opposite (>100%) | 1,132 | 14% [12-16] | 29% | 51% |
+
+Hindsight conditioning (zone known only at EOD). The edge-to-25%-inside band is where continuation stays a strong favourite (89-97%); depth beyond the mid is where the day becomes a coin flip.
