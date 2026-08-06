@@ -266,3 +266,33 @@ Among continuations where the pre-HH/LL pullback floor stayed beyond the broken 
 | p50 |                      3.00 |                    20.41 |
 | p75 |                      6.30 |                    39.46 |
 | p90 |                     11.20 |                    63.46 |
+
+## Deepest pullback of the session — one zone per session (modal analysis)
+
+### All events (n=3,683)
+
+|                                 | share of sessions   |
+|:--------------------------------|:--------------------|
+| held >50% of range ABOVE edge   | 2.3%                |
+| held 25-50% above               | 3.5%                |
+| held 10-25% above               | 5.2%                |
+| held 0-10% above (didn't touch) | 7.5%                |
+| touched edge / 0-25% into range | 16.2%               |
+| 25-50% into range               | 13.3%               |
+| 50-75% into (mid zone)          | 11.8%               |
+| 75-100% into                    | 9.6%                |
+| beyond opposite side (>100%)    | 30.7%               |
+
+### Day closed beyond the edge (winners) (n=2,090)
+
+|                                 | share of sessions   |
+|:--------------------------------|:--------------------|
+| held >50% of range ABOVE edge   | 4.0%                |
+| held 25-50% above               | 6.2%                |
+| held 10-25% above               | 9.1%                |
+| held 0-10% above (didn't touch) | 13.2%               |
+| touched edge / 0-25% into range | 26.2%               |
+| 25-50% into range               | 16.6%               |
+| 50-75% into (mid zone)          | 11.6%               |
+| 75-100% into                    | 5.6%                |
+| beyond opposite side (>100%)    | 7.6%                |
