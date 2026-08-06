@@ -155,3 +155,41 @@ Holds beyond the edge in 16.6% of cases (n=283 of 1,702).
 | p50 |                         2.70 |                       16.57 |
 | p75 |                         5.25 |                       37.12 |
 | p90 |                         9.20 |                       61.89 |
+
+## Pullback before a NEW HH/LL (beyond the acceptance candle's extreme)
+
+After one candle has closed in the direction, how far does price come back before printing a new higher high (longs) / lower low (shorts) beyond that candle's extreme?
+
+### LONG (n=1,981)
+
+- New extreme printed before 16:00: **90.9%** of events; immediate (<=15 min, momentum): 75.7%; after a real pullback (>15 min): 24.3% (n=438), median wait 45 min.
+
+Delayed-continuation subset (pullback-first scenario):
+
+|     |   Pullback (pts) |   Pullback (% of ORB range) |   Floor vs edge (pts, +=held beyond) |
+|:----|-----------------:|----------------------------:|-------------------------------------:|
+| p10 |             2.00 |                       15.40 |                               -15.05 |
+| p25 |             3.33 |                       23.27 |                                -7.48 |
+| p50 |             5.70 |                       42.23 |                                -3.70 |
+| p75 |            10.00 |                       75.20 |                                -1.00 |
+| p90 |            18.69 |                      114.27 |                                 1.20 |
+
+- Held beyond the ORB high: 14.8% (median 1.50 pts / 12.9% of range beyond the edge)
+- Re-entered the range first: 83.6% (median depth inside 4.40 pts / 31.6% of range)
+
+### SHORT (n=1,702)
+
+- New extreme printed before 16:00: **87.7%** of events; immediate (<=15 min, momentum): 77.1%; after a real pullback (>15 min): 22.9% (n=342), median wait 46 min.
+
+Delayed-continuation subset (pullback-first scenario):
+
+|     |   Pullback (pts) |   Pullback (% of ORB range) |   Floor vs edge (pts, +=held beyond) |
+|:----|-----------------:|----------------------------:|-------------------------------------:|
+| p10 |             2.71 |                       21.25 |                               -17.78 |
+| p25 |             4.00 |                       33.02 |                                -8.50 |
+| p50 |             6.90 |                       51.77 |                                -4.00 |
+| p75 |            12.30 |                       81.39 |                                -1.30 |
+| p90 |            21.48 |                      132.87 |                                 0.98 |
+
+- Held beyond the ORB low: 13.5% (median 1.70 pts / 15.1% of range beyond the edge)
+- Re-entered the range first: 84.8% (median depth inside 4.90 pts / 39.2% of range)
