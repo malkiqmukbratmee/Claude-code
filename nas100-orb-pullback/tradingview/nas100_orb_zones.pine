@@ -1,0 +1,152 @@
+//@version=5
+// NAS100 NY ORB — Pullback Zones + Live Odds
+// Based on a statistical study of 3,683 sessions (2005–2020, OANDA NAS100 CFD 1-min).
+// Designed for the 15-MINUTE chart of NAS100/US100. Zones and odds follow the study:
+//   - ORB = 09:30–10:00 New York (16:30–17:00 BG)
+//   - Acceptance = first 15m close outside the range
+//   - Zone touch odds (winner days): edge 69% | +10% 81% | +25% 90% | +35% 93% | +50% 96%
+//   - State machine: acceptance -> fail (15m close back inside) -> double distribution
+indicator("NAS100 ORB Pullback Zones + Odds", "ORB Zones", overlay = true,
+     max_boxes_count = 500, max_lines_count = 500, max_labels_count = 500)
+
+tzNY      = "America/New_York"
+sesORB    = input.session("0930-1000", "Opening range (NY time)")
+sesRTH    = input.session("0930-1600", "Full session (NY time)")
+showZones = input.bool(true,  "Show pullback zones")
+showTable = input.bool(true,  "Show probability table")
+bgTime    = input.bool(true,  "Table labels in Bulgarian")
+
+inORB  = not na(time(timeframe.period, sesORB, tzNY))
+inRTH  = not na(time(timeframe.period, sesRTH, tzNY))
+newSes = inORB and not inORB[1]
+
+var float orbH = na
+var float orbL = na
+var int   dir  = 0          // 1 = long acceptance, -1 = short
+var bool  failed  = false   // a 15m close back inside the range
+var bool  dd      = false   // double distribution (opposite-side acceptance)
+var bool  reAcc   = false   // re-acceptance of the original side after a fail
+var float accClose = na
+var int   accBar   = na
+var float accExt   = na     // acceptance candle extreme
+var bool  newExt15 = false  // new HH/LL within the +1 candle (momentum tell)
+var bool  orbDone  = false
+
+if newSes
+    orbH := high
+    orbL := low
+    dir := 0
+    failed := false
+    dd := false
+    reAcc := false
+    accClose := na
+    accBar := na
+    accExt := na
+    newExt15 := false
+    orbDone := false
+else if inORB
+    orbH := math.max(orbH, high)
+    orbL := math.min(orbL, low)
+
+if not inORB and inRTH and not na(orbH)
+    orbDone := true
+
+rng = orbH - orbL
+
+// ---- state machine on confirmed 15m closes ----
+if barstate.isconfirmed and orbDone and inRTH and rng > 0
+    if dir == 0
+        if close > orbH
+            dir := 1
+            accClose := close
+            accExt := high
+            accBar := bar_index
+        else if close < orbL
+            dir := -1
+            accClose := close
+            accExt := low
+            accBar := bar_index
+    else
+        if bar_index == accBar + 1
+            newExt15 := dir == 1 ? high > accExt : low < accExt
+        if close <= orbH and close >= orbL
+            failed := true
+        if failed
+            if (dir == 1 and close < orbL) or (dir == -1 and close > orbH)
+                dd := true
+            else if (dir == 1 and close > orbH) or (dir == -1 and close < orbL)
+                reAcc := true
+
+// ---- ORB lines ----
+var line lH = na
+var line lL = na
+var line lM = na
+if orbDone and not orbDone[1]
+    lH := line.new(bar_index, orbH, bar_index, orbH, color = color.new(color.blue, 0), width = 2)
+    lL := line.new(bar_index, orbL, bar_index, orbL, color = color.new(color.blue, 0), width = 2)
+    lM := line.new(bar_index, (orbH + orbL) / 2, bar_index, (orbH + orbL) / 2, color = color.new(color.gray, 40), style = line.style_dotted)
+if orbDone and inRTH
+    line.set_x2(lH, bar_index), line.set_y1(lH, orbH), line.set_y2(lH, orbH)
+    line.set_x2(lL, bar_index), line.set_y1(lL, orbL), line.set_y2(lL, orbL)
+    line.set_x2(lM, bar_index), line.set_y1(lM, (orbH + orbL) / 2), line.set_y2(lM, (orbH + orbL) / 2)
+
+// ---- pullback zones above/below the broken edge ----
+var box zA = na
+var box zB = na
+var box zC = na
+var box zD = na
+mkZone(_l, _r, _top, _bot, _col) =>
+    box.new(_l, _top, _r, _bot, border_color = color.new(_col, 60), bgcolor = color.new(_col, 82))
+
+if showZones and dir != 0 and dir[1] == 0
+    edge = dir == 1 ? orbH : orbL
+    s = dir == 1 ? 1.0 : -1.0
+    zA := mkZone(accBar, bar_index, edge + s * 0.10 * rng, edge, color.green)             // 0–10%: modal floor zone (34% of holders), fill 81%
+    zB := mkZone(accBar, bar_index, edge + s * 0.25 * rng, edge + s * 0.10 * rng, color.lime)  // 10–25%: cumulative fill 90% at +25
+    zC := mkZone(accBar, bar_index, edge + s * 0.35 * rng, edge + s * 0.25 * rng, color.yellow) // 25–35%: fill 93% at +35
+    zD := mkZone(accBar, bar_index, edge + s * 0.50 * rng, edge + s * 0.35 * rng, color.orange) // 35–50%: fill 96% at +50
+    label.new(bar_index, edge + s * 0.05 * rng, "0-10%: мода на дъното (34%) | пълни се 81%", style = dir == 1 ? label.style_label_left : label.style_label_left, color = color.new(color.green, 70), textcolor = color.white, size = size.small)
+    label.new(bar_index, edge + s * 0.175 * rng, "+25%: пълни се 90%", style = label.style_label_left, color = color.new(color.lime, 70), textcolor = color.white, size = size.small)
+    label.new(bar_index, edge + s * 0.425 * rng, "+50%: пълни се 96% | стоп зона под средата", style = label.style_label_left, color = color.new(color.orange, 70), textcolor = color.white, size = size.small)
+if showZones and dir != 0 and inRTH
+    box.set_right(zA, bar_index)
+    box.set_right(zB, bar_index)
+    box.set_right(zC, bar_index)
+    box.set_right(zD, bar_index)
+
+// ---- live odds table ----
+var table tb = table.new(position.top_right, 2, 8, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 60))
+row(_i, _a, _b, _hl) =>
+    table.cell(tb, 0, _i, _a, text_color = color.white, text_size = size.small, text_halign = text.align_left)
+    table.cell(tb, 1, _i, _b, text_color = _hl ? color.yellow : color.white, text_size = size.small)
+
+if barstate.islast and showTable
+    table.clear(tb, 0, 0, 1, 7)
+    if timeframe.period != "15"
+        row(0, "СЛОЖИ 15-МИН ГРАФИКА", "!", true)
+    else if dir == 0
+        row(0, "СЪСТОЯНИЕ", orbDone ? "чакаме 15м клоуз извън ОРБ" : "строим ОРБ 16:30-17:00", true)
+        row(1, "Клоуз в посоката (лонг/шорт)", "75% / 72%", false)
+        row(2, "Клоуз отвъд пробития ръб", "60% / 53%", false)
+        row(3, "Клоуз обратно в рейнджа", "25% / 30%", false)
+        row(4, "Реверс отвъд отсрещния ръб", "15% / 16%", false)
+    else if dd
+        row(0, "СЪСТОЯНИЕ", "ДВОЙНА ДИСТРИБУЦИЯ", true)
+        row(1, "Клоуз СРЕЩУ оригиналния пробив", "77%", true)
+        row(2, "Клоуз отвъд отсрещния ръб", "61%", false)
+        row(3, "Връщане отвъд оригиналния ръб", "11%", false)
+        row(4, "Клоуз вътре в рейнджа", "27%", false)
+    else if failed
+        row(0, "СЪСТОЯНИЕ", "ФЕЙЛ: 15м клоуз вътре", true)
+        row(1, "Следващ пробив = пак същата страна", "67%", false)
+        row(2, "Шанс за двойна дистрибуция", "35%", true)
+        row(3, "Клоуз срещу оригиналния пробив", "35%", false)
+        row(4, "Клоуз пак отвъд оригиналния ръб", reAcc ? "re-accept: да" : "42%", false)
+    else
+        row(0, "СЪСТОЯНИЕ", (dir == 1 ? "ACCEPTANCE НАГОРЕ" : "ACCEPTANCE НАДОЛУ") + (newExt15 ? " + моментум" : ""), true)
+        row(1, "Клоуз в посоката", newExt15 ? ">90%" : "75%", newExt15)
+        row(2, "Ретест на ръба (медиана 6 мин)", "82%", false)
+        row(3, "Лимит ръб+25% се пълни (печеливш ден)", "90%", true)
+        row(4, "Без нито един 15м клоуз вътре до 23:00", "31% от дните -> 98.5% посока", false)
+        row(5, "Средата се пипа", "52%", false)
+        row(6, "Пълен реверс", "15%", false)
