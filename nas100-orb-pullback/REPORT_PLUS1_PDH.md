@@ -242,3 +242,27 @@ A later 15-min candle closes back INSIDE the range after 2,616 of 3,683 acceptan
 
 - Day closes against the original direction: 77.5% [74.7–80.1]
 - Day closes beyond the opposite edge: 62.1% [58.9–65.2]
+
+## THE key number: floor distance ABOVE the range before the new HH (holders)
+
+Among continuations where the pre-HH/LL pullback floor stayed beyond the broken edge:
+
+### LONG — held above ORB high (n=1,107, 61.5% of continuations)
+
+|     |   Floor beyond edge (pts) |   Floor (% of ORB range) |
+|:----|--------------------------:|-------------------------:|
+| p10 |                      0.50 |                     3.22 |
+| p25 |                      1.00 |                     7.66 |
+| p50 |                      2.50 |                    16.00 |
+| p75 |                      5.00 |                    31.58 |
+| p90 |                      9.00 |                    53.53 |
+
+### SHORT — held below ORB low (n=991, 66.4% of continuations)
+
+|     |   Floor beyond edge (pts) |   Floor (% of ORB range) |
+|:----|--------------------------:|-------------------------:|
+| p10 |                      0.60 |                     4.31 |
+| p25 |                      1.45 |                     9.56 |
+| p50 |                      3.00 |                    20.41 |
+| p75 |                      6.30 |                    39.46 |
+| p90 |                     11.20 |                    63.46 |
