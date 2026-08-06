@@ -127,8 +127,15 @@ var box zA = na
 var box zB = na
 var box zC = na
 var box zD = na
+var label t50 = na
+var label t35 = na
+var label t25 = na
+var label t10 = na
+var label t00 = na
 mkZone(_l, _r, _top, _bot, _col) =>
     box.new(_l, _top, _r, _bot, border_color = color.new(_col, 60), bgcolor = color.new(_col, 82))
+mkTxt(_y, _txt, _col) =>
+    label.new(bar_index, _y, _txt, style = label.style_none, textcolor = _col, size = size.small, textalign = text.align_left)
 
 if showZones and dir != 0 and dir[1] == 0
     edge = dir == 1 ? orbH : orbL
@@ -137,14 +144,22 @@ if showZones and dir != 0 and dir[1] == 0
     zB := mkZone(accBar, bar_index, edge + s * 0.25 * rng, edge + s * 0.10 * rng, color.lime)
     zC := mkZone(accBar, bar_index, edge + s * 0.35 * rng, edge + s * 0.25 * rng, color.yellow)
     zD := mkZone(accBar, bar_index, edge + s * 0.50 * rng, edge + s * 0.35 * rng, color.orange)
-    label.new(bar_index, edge + s * 0.05 * rng,  "0-10%: мода на дъното (34%) | пълни се 81%", style = label.style_label_left, color = color.new(color.green, 70), textcolor = color.white, size = size.small)
-    label.new(bar_index, edge + s * 0.175 * rng, "+25%: пълни се 90%", style = label.style_label_left, color = color.new(color.lime, 70), textcolor = color.white, size = size.small)
-    label.new(bar_index, edge + s * 0.425 * rng, "+50%: пълни се 96% | под средата = стоп зона", style = label.style_label_left, color = color.new(color.orange, 70), textcolor = color.white, size = size.small)
+    t50 := mkTxt(edge + s * 0.50 * rng, "+50%  |  връща се дотук: 96%", color.orange)
+    t35 := mkTxt(edge + s * 0.35 * rng, "+35%  |  93%", color.yellow)
+    t25 := mkTxt(edge + s * 0.25 * rng, "+25%  |  90%", color.lime)
+    t10 := mkTxt(edge + s * 0.10 * rng, "+10%  |  81%  (дъното пада тук: 34%)", color.green)
+    t00 := mkTxt(edge,                   "0% ръб  |  69%", color.new(color.blue, 0))
 if showZones and dir != 0 and inRTH
     box.set_right(zA, bar_index)
     box.set_right(zB, bar_index)
     box.set_right(zC, bar_index)
     box.set_right(zD, bar_index)
+    off = 12
+    label.set_x(t50, bar_index + off)
+    label.set_x(t35, bar_index + off)
+    label.set_x(t25, bar_index + off)
+    label.set_x(t10, bar_index + off)
+    label.set_x(t00, bar_index + off)
 
 // ---- жива таблица (данни от 15м state machine, на всякакъв TF) ----
 var table tb = table.new(position.top_right, 2, 8, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 60))
