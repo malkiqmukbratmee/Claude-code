@@ -342,3 +342,17 @@ P(the session's pullback comes down AT LEAST to the level):
 | edge +25%          | 90.0% [88.6–91.2]           |
 | edge +10%          | 80.7% [79.0–82.4]           |
 | the edge itself    | 69.1% [67.1–71.1]           |
+
+## Edge-touch count per winner session (5-min episode separation, n=2,090)
+
+| Touches | Share |
+|---|---|
+| 0 | 30.9% |
+| 1 | 21.5% |
+| 2 | 17.0% |
+| 3 | 12.7% |
+| 4 | 7.8% |
+| 5 | 5.0% |
+| 6+ | 5.2% |
+
+Mean 1.85, median 1. P(>=1) 69.1%, P(>=2) 47.7%, P(>=3) 30.7%. Given at least one touch: P(another) 68.9%, mean 2.67 touches total.
