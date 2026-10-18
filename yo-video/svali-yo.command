@@ -1,5 +1,5 @@
 #!/bin/bash
-DIR="$HOME/Desktop/ЙО"
+DIR="$HOME/Desktop/йо"
 mkdir -p "$DIR"
 cd "$DIR" || exit 1
 curl -sSfL -o "1.png" "https://d8j0ntlcm91z4.cloudfront.net/user_3JmnyvS7Sj3iQFd7Xb9DelnaweD/hf_20261018_134851_9b4443ae-dc02-4fed-888b-48eb19077a7a.png" && echo "1.png" || echo "ГРЕШКА при 1.png"
