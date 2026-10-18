@@ -1,46 +1,60 @@
-"""Estimates start/end time for every YO image from where its anchor phrase sits in the transcript.
+"""Start/end time for every YO image, from the per-sentence timestamps in subs.txt.
 
-Speech is assumed to be evenly paced inside each transcript section, so times are approximate (about ±2-3 s).
-Each image runs at most MAX_LEN seconds, leaving short gaps where the speaker is on screen.
+Each anchor phrase is located in the transcript (in video order). Its time is interpolated
+inside its sentence. Images of one anchor share the time until the next anchor, each at most MAX_LEN s.
 """
-import re
-from transcript import SECTIONS as T, END
-from scenes import SECTIONS as S
+import os, re
+from scenes import SECTIONS
 
 MAX_LEN = 5.0
-sec = lambda t: int(t.split(":")[0]) * 60 + int(t.split(":")[1])
+HERE = os.path.dirname(os.path.abspath(__file__))
 norm = lambda s: re.sub(r"\s+", " ", re.sub(r"[^\w ]", " ", s.lower())).strip()
-fmt = lambda x: f"{int(x)//60}:{int(x)%60:02d}"
+fmt = lambda x: f"{int(round(x))//60}:{int(round(x))%60:02d}"
 
-def anchor_pos(text, anchor):
-    t, a = norm(text), norm(anchor)
-    for key, shift in ((a, 0), (a[:25], 0), (a[-25:], len(a) - 25)):
-        p = t.find(key)
-        if p >= 0:
-            return max(0, p - shift)
-    raise ValueError(anchor)
+def load_subs():
+    lines = []
+    for raw in open(os.path.join(HERE, "subs.txt"), encoding="utf-8"):
+        m = re.match(r"(\d+):(\d+)\s+(.*)", raw.strip())
+        if m:
+            lines.append((int(m[1]) * 60 + int(m[2]), norm(m[3])))
+    text, times = "", []          # times[i] = second at character i of text
+    for (t0, s), (t1, _) in zip(lines, lines[1:]):
+        s += " "
+        times += [t0 + (t1 - t0) * k / len(s) for k in range(len(s))]
+        text += s
+    return text, times, lines[-1][0]
 
 def rows():
-    starts = [sec(t) for t, _ in T] + [sec(END)]
+    text, times, end = load_subs()
+    cur, marks = 0, []
+    for title, _, items in SECTIONS:
+        for anchor, scenes in items:
+            a = norm(anchor)
+            for key, shift in ((a, 0), (a[:25], 0), (a[-25:], len(a) - 25)):
+                p = text.find(key, cur)
+                if p >= 0:
+                    p = max(cur, p - shift); break
+            else:
+                raise ValueError(anchor)
+            cur = p
+            marks.append((title, anchor, scenes, times[p]))
     n = 0
-    for i, ((_, text), (title, _, items)) in enumerate(zip(T, S)):
-        s0, s1, L = starts[i], starts[i + 1], len(norm(text))
-        times = [s0 + (s1 - s0) * anchor_pos(text, a) / L for a, _ in items] + [s1]
-        for j, (anchor, scenes) in enumerate(items):
-            slot = (times[j + 1] - times[j]) / len(scenes)
-            for k, scene in enumerate(scenes):
-                n += 1
-                b = times[j] + k * slot
-                yield n, title, anchor, scene, b, b + min(slot, MAX_LEN)
+    for i, (title, anchor, scenes, t) in enumerate(marks):
+        nxt = marks[i + 1][3] if i + 1 < len(marks) else end
+        slot = (nxt - t) / len(scenes)
+        for k, scene in enumerate(scenes):
+            n += 1
+            b = t + k * slot
+            yield n, title, anchor, scene, b, b + max(1.0, min(slot, MAX_LEN))
 
 if __name__ == "__main__":
-    out = ["# ЙО – коя снимка кога влиза", "",
-           "Снимките са в Desktop/йо като 1.png … 170.png. Времената са по таймлайна в CapCut, изчислени по мястото на изречението в текста, затова може да се разминават с 2–3 секунди. Ориентирай се по цитата и дръпни снимката до точната дума.", ""]
-    sec_t = None
+    out = ["# ЙО – коя снимка кога влиза (по субтитрите)", "",
+           "Снимките са в Desktop/йо като 1.png … 170.png. Времената са по таймлайна в CapCut.", ""]
+    sec = None
     for n, title, anchor, scene, b, e in rows():
-        if title != sec_t:
-            sec_t = title
+        if title != sec:
+            sec = title
             out += ["", f"## {title}", "", "| Снимка | От | До | Изречение |", "|---|---|---|---|"]
         out.append(f"| **{n}** | {fmt(b)} | {fmt(e)} | „{anchor}“ |")
-    open("snimki-vreme.md", "w").write("\n".join(out) + "\n")
-    print("ok")
+    open(os.path.join(HERE, "snimki-vreme.md"), "w").write("\n".join(out) + "\n")
+    print("\n".join(f"{n}  {fmt(b)} - {fmt(e)}" for n, _, _, _, b, e in rows()))
