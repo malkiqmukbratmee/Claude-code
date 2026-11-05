@@ -16,7 +16,8 @@ YouTube фабриката без Mac и без CapCut: сваляне, ряза
 ## Какво трябва на средата
 
 - **Мрежа:** Full. Свалят се войсове от Google Drive, моделът от huggingface.co и снимки от много сайтове.
-- **Променливи:** `SERPER_API_KEY` (снимки от Google Images), `YT_CLIENT_SECRET_JSON` (OAuth клиент от тип „TVs and Limited Input devices“).
+- **Ключът за Serper:** network secret за `google.serper.dev` (хедър `X-API-KEY`), заявките вървят без ключ в кода.
+- **Променлива:** `YT_CLIENT_SECRET_JSON` (OAuth клиент от тип „TVs and Limited Input devices“).
 - **Токените на каналите:** в `YT_TOKENS_FILE` (по подразбиране `~/.config/youtube-cloud/tokens.json`). Контейнерът се трие, затова файлът се пази извън него.
 
 ## Команди
