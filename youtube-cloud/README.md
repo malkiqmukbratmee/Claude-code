@@ -8,6 +8,7 @@ YouTube фабриката без Mac и без CapCut: сваляне, ряза
 | `render_short.py` | шортове 9:16: видеото x1.25, червено заглавие (Slide Down / Fade Out) до половината, „АБОНИРАЙ СЕ / ЗА КАНАЛА“ последните 4 s, субтитри ГЛАВНИ на един ред; реже в най-тихото място |
 | `yt_upload.py` | вход в каналите с код (google.com/device), качване private или насрочено, тъмбнейл, проверка, квота → `.pending.json` |
 | `setup.sh` | подготвя средата: шрифт, yt-dlp, python пакети, моделът за whisper |
+| `check_description.py` | проверява описанието по правилата (без тирета, глави от 0:00, ред за абониране, 4–5 хаштага; шорт: 2–3 изречения и #shorts); `yt_upload.py` я пуска сам |
 | `fonts.py` | намира шрифтовете |
 
 Рязането на войса и whisper са в skill-а `youtube-factory` (`pipeline/voice-cut`, работи и на Linux с faster-whisper).

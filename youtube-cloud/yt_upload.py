@@ -129,6 +129,11 @@ def check(item, base):
     desc = item.get("description", "")
     if len(desc) > 5000: errs.append(f"описанието е {len(desc)} знака (до 5000)")
     if "<" in desc or ">" in desc: errs.append("описанието съдържа < или >")
+    if item.get("rules", True):  # правилата на фабриката; "rules": false ги изключва за отделно видео
+        sys.path.append(str(Path(__file__).resolve().parent))
+        from check_description import check as rules
+        short = "#shorts" in desc.lower()
+        errs += [f"описание: {e}" for e in rules(desc, short=short) if "5000" not in e and "<" not in e]
     if item.get("thumbnail") and not (base / item["thumbnail"]).exists(): errs.append("няма тъмбнейла")
     pa = item.get("publish_at")
     if pa and pa != "now":
