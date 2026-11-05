@@ -9,6 +9,7 @@ YouTube фабриката без Mac и без CapCut: сваляне, ряза
 | `yt_upload.py` | вход в каналите с код (google.com/device), качване private или насрочено, тъмбнейл, проверка, квота → `.pending.json` |
 | `setup.sh` | подготвя средата: шрифт, yt-dlp, python пакети, моделът за whisper |
 | `check_description.py` | проверява описанието по правилата (без тирета, глави от 0:00, ред за абониране, 4–5 хаштага; шорт: 2–3 изречения и #shorts); `yt_upload.py` я пуска сам |
+| `notion_when.py` | чете датата и часа под „Качване:“ в Notion; без конкретна дата И час връща „НЯМА“ |
 | `fonts.py` | намира шрифтовете |
 
 Рязането на войса и whisper са в skill-а `youtube-factory` (`pipeline/voice-cut`, работи и на Linux с faster-whisper).
@@ -37,3 +38,7 @@ uv run --with google-api-python-client --with google-auth python yt_upload.py au
 ```bash
 uv run --with google-api-python-client --with google-auth python yt_upload.py upload plan.json --dry-run
 ```
+
+## Правило за качване
+
+Видеото и шортовете се обработват веднага, но се качват и насрочват **само** когато под „Качване:“ в Notion има конкретна дата и час. `yt_upload.py` изчислява часа сам от суровия текст (`notion_kacvane`, за шорт и `slot` като `D+1 12:00`) и отказва всичко без дата и час. Готовото чака и при всяка проверка се гледа дали датата се е появила.

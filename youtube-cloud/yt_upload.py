@@ -13,12 +13,15 @@
 
 plan.json: [{"channel": "<канал>", "file": "x.mp4", "title": "...", "description": "...", "tags": [...],
              "category": "17", "language": "bg", "privacy": "private",
-             "publish_at": "2026-11-06T18:00:00+02:00" | "now" | null, "thumbnail": "t.jpg"}]
-publish_at в бъдещето = качва се private и YouTube го пуска сам в този час. "now" = public веднага.
-Без publish_at = private (той го пуска сам). При изчерпана квота останалото отива в <plan>.pending.json.
+             "notion_kacvane": "<суровият текст под Качване: в Notion>", "slot": "D+1 12:00" (само за шорт),
+             "thumbnail": "t.jpg"}]
+ПРАВИЛО: часът се изчислява САМО от notion_kacvane (notion_when.py); готов publish_at не се приема. Без конкретна
+дата и час нищо не се качва и не се насрочва: видеото се обработва, остава готово и чака, докато в Notion се появи
+дата и час. Качва се private с publishAt и YouTube го пуска сам. При изчерпана квота останалото е в <plan>.pending.json.
 """
 import datetime as dt
 import json
+import re
 import os
 import sys
 import time
@@ -135,20 +138,32 @@ def check(item, base):
         short = "#shorts" in desc.lower()
         errs += [f"описание: {e}" for e in rules(desc, short=short) if "5000" not in e and "<" not in e]
     if item.get("thumbnail") and not (base / item["thumbnail"]).exists(): errs.append("няма тъмбнейла")
-    pa = item.get("publish_at")
-    if pa and pa != "now":
-        when = dt.datetime.fromisoformat(pa)
-        if when.tzinfo is None: errs.append("publish_at трябва да има часова зона (+02:00)")
-        elif when < dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=15): errs.append("publish_at е в миналото")
+    # Часът идва САМО от суровия текст под „Качване:“ в Notion (notion_kacvane); готов publish_at не се приема.
+    # Шорт: "slot": "D+1 12:00" = денят от Notion + 1, в 12:00.
+    sys.path.append(str(Path(__file__).resolve().parent))
+    from notion_when import parse as notion_parse, TZ
+    when = notion_parse(item.get("notion_kacvane", ""))
+    if not when:
+        errs.append("няма дата и час под „Качване:“ в Notion: не качвам и не насрочвам, видеото чака")
+    else:
+        slot = item.get("slot")
+        if slot:
+            m = re.fullmatch(r"\s*D\+(\d)\s+([01]?\d|2[0-3]):([0-5]\d)\s*", slot)
+            if not m:
+                errs.append(f"слотът '{slot}' трябва да е като 'D+1 12:00'")
+            else:
+                d = when.date() + dt.timedelta(days=int(m.group(1)))
+                when = dt.datetime(d.year, d.month, d.day, int(m.group(2)), int(m.group(3)), tzinfo=TZ)
+        if when < dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=15):
+            errs.append(f"часът {when:%d.%m.%Y %H:%M} вече е минал")
+        item["publish_at"] = when.isoformat()
     return errs
 
 
 def body(item):
     pa = item.get("publish_at")
     status = {"privacyStatus": item.get("privacy", "private"), "selfDeclaredMadeForKids": False}
-    if pa == "now":
-        status["privacyStatus"] = "public"
-    elif pa:
+    if pa:
         status["privacyStatus"] = "private"
         status["publishAt"] = dt.datetime.fromisoformat(pa).astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     sn = {"title": item["title"], "description": item.get("description", ""), "tags": item.get("tags", []),
