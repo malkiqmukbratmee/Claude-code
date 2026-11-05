@@ -148,9 +148,9 @@ def check(item, base):
     else:
         slot = item.get("slot")
         if slot:
-            m = re.fullmatch(r"\s*D\+(\d)\s+([01]?\d|2[0-3]):([0-5]\d)\s*", slot)
+            m = re.fullmatch(r"\s*D\+([1-9])\s+([01]?\d|2[0-3]):([0-5]\d)\s*", slot)  # шорт е винаги след деня на дългото
             if not m:
-                errs.append(f"слотът '{slot}' трябва да е като 'D+1 12:00'")
+                errs.append(f"слотът '{slot}' трябва да е като 'D+1 12:00' (шортовете тръгват от деня след дългото видео)")
             else:
                 d = when.date() + dt.timedelta(days=int(m.group(1)))
                 when = dt.datetime(d.year, d.month, d.day, int(m.group(2)), int(m.group(3)), tzinfo=TZ)
@@ -215,6 +215,12 @@ def cmd_upload(plan_path, dry):
         sys.exit("Поправи плана; нищо не е качено.")
     for x in items:
         find_channel(x["channel"])
+    # първо дългото видео, после шортовете по реда на часа им; ако дългото не мине, шортовете не тръгват
+    items.sort(key=lambda x: (1 if x.get("slot") else 0, x["publish_at"]))
+    longs = [x for x in items if not x.get("slot")]
+    for s in (x for x in items if x.get("slot")):
+        if not any(l["publish_at"] < s["publish_at"] for l in longs) and not s.get("long_already_uploaded"):
+            sys.exit(f"Шортът '{s['title']}' няма дълго видео преди себе си в плана; нищо не е качено.")
     if dry:
         for x in items:
             print(json.dumps({"channel": x["channel"], "file": x["file"], **body(x)}, ensure_ascii=False)[:400])
