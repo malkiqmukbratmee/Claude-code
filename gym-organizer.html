@@ -1,0 +1,607 @@
+<title>Тренировъчен дневник</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: phone-first single column app. Sticky top bar, scrolling content, fixed bottom tab bar, rest timer docked above the tabs. */
+:root {
+  --bg: #14171c;
+  --surface: #1d2128;
+  --surface-2: #272c35;
+  --line: #333a46;
+  --fg: #eef0f3;
+  --muted: #9aa3b0;
+  --accent: #f2b544;
+  --accent-ink: #1a1407;
+  --ok: #4cc38a;
+  --ok-ink: #062b18;
+  --danger: #ef6461;
+  --display: 'Barlow Condensed', Impact, 'Arial Narrow', sans-serif;
+  --body: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #eef0f3; --surface: #ffffff; --surface-2: #f3f4f7; --line: #d6dae1;
+    --fg: #171a1f; --muted: #5d6774; --accent: #d9901c; --accent-ink: #1a1407;
+    --ok: #1f9d61; --ok-ink: #ffffff; --danger: #d4403d;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #eef0f3; --surface: #ffffff; --surface-2: #f3f4f7; --line: #d6dae1;
+  --fg: #171a1f; --muted: #5d6774; --accent: #d9901c; --accent-ink: #1a1407;
+  --ok: #1f9d61; --ok-ink: #ffffff; --danger: #d4403d;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.4; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--bg); border-bottom: 1px solid var(--line); }
+.top-inner { max-width: 720px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { font-family: var(--display); font-weight: 800; font-size: 22px; letter-spacing: .06em; text-transform: uppercase; }
+.brand span { color: var(--accent); }
+.sync { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.sync i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.sync.ok i { background: var(--ok); }
+.sync.err i { background: var(--danger); }
+.sync.busy i { background: var(--accent); }
+
+.wrap { max-width: 720px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 140px; display: flex; flex-direction: column; gap: 14px; }
+
+h1, h2, h3 { font-family: var(--display); text-transform: uppercase; letter-spacing: .03em; margin: 0; text-wrap: balance; line-height: 1.05; }
+h1 { font-size: 34px; font-weight: 800; }
+h2 { font-size: 24px; font-weight: 700; }
+h3 { font-size: 19px; font-weight: 700; }
+.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); font-weight: 600; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.card.flat { background: transparent; border-style: dashed; }
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.row.between { justify-content: space-between; }
+.grow { flex: 1 1 auto; min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+
+.btn { font: inherit; font-weight: 600; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); border-radius: 10px; padding: 10px 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; white-space: nowrap; }
+.btn:hover { border-color: var(--muted); }
+.btn:focus-visible, input:focus-visible, textarea:focus-visible, .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-family: var(--display); text-transform: uppercase; letter-spacing: .06em; font-size: 18px; font-weight: 700; }
+.btn.ok { background: var(--ok); color: var(--ok-ink); border-color: var(--ok); }
+.btn.danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+.btn.ghost { background: transparent; }
+.btn.sm { padding: 6px 10px; min-height: 34px; font-size: 14px; }
+.btn.icon { width: 40px; padding: 0; min-height: 40px; }
+.btn.big { width: 100%; min-height: 54px; }
+.btn[disabled] { opacity: .5; cursor: default; }
+
+input, textarea, select { font: inherit; color: var(--fg); background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%; min-width: 0; }
+input[type="number"] { font-variant-numeric: tabular-nums; }
+textarea { resize: vertical; min-height: 56px; }
+label.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; min-width: 0; }
+label.field input, label.field textarea { font-size: 16px; text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--fg); }
+.fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.fields .span2 { grid-column: span 2; }
+.fields .span4 { grid-column: span 4; }
+@media (max-width: 460px) { .fields { grid-template-columns: repeat(2, 1fr); } .fields .span4 { grid-column: span 2; } }
+
+.daystrip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.daychip { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 2px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--fg); font: inherit; }
+.daychip .d { font-family: var(--display); font-weight: 700; font-size: 16px; text-transform: uppercase; }
+.daychip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.daychip.has .dot { background: var(--accent); }
+.daychip.done .dot { background: var(--ok); }
+.daychip.today { border-color: var(--accent); }
+.daychip.sel { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.daychip.sel .dot { background: var(--accent-ink); }
+
+.exlist { display: flex; flex-direction: column; gap: 8px; }
+.ex { border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ex .name { font-weight: 700; font-size: 17px; overflow-wrap: anywhere; }
+.ex .target { color: var(--muted); font-size: 14px; }
+.ex .target b { color: var(--fg); font-weight: 600; }
+.pill { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
+.pill.accent { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.pill.ok { background: var(--ok); color: var(--ok-ink); border-color: var(--ok); }
+
+.sets { display: flex; flex-direction: column; gap: 6px; }
+.sethead, .set { display: grid; grid-template-columns: 34px 1fr 1fr 64px; gap: 8px; align-items: center; }
+.sethead { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; }
+.set .idx { font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--muted); text-align: center; }
+.set input { text-align: center; padding: 8px 4px; font-weight: 600; }
+.set.done input { color: var(--muted); }
+.set .chk { width: 100%; min-height: 40px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font: inherit; font-size: 18px; cursor: pointer; }
+.set.done .chk { background: var(--ok); color: var(--ok-ink); border-color: var(--ok); }
+.last { font-size: 13px; color: var(--muted); }
+.last b { color: var(--fg); font-weight: 600; }
+
+.workhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.elapsed { font-family: var(--display); font-weight: 700; font-size: 28px; font-variant-numeric: tabular-nums; }
+
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.tabs-inner { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); }
+.tab { background: none; border: 0; color: var(--muted); font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: .08em; text-transform: uppercase; padding: 12px 4px 10px; cursor: pointer; border-top: 3px solid transparent; margin-top: -1px; }
+.tab.active { color: var(--accent); border-top-color: var(--accent); }
+
+.rest { position: fixed; left: 0; right: 0; bottom: calc(58px + env(safe-area-inset-bottom, 0px)); z-index: 8; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.rest-inner { max-width: 720px; margin: 0 auto 8px; background: var(--accent); color: var(--accent-ink); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.rest-inner .t { font-family: var(--display); font-weight: 800; font-size: 32px; font-variant-numeric: tabular-nums; line-height: 1; }
+.rest-inner .lbl { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; opacity: .8; }
+.rest-inner .who { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rest-inner .btn { background: rgba(0,0,0,.14); border-color: transparent; color: inherit; }
+.rest-inner.over { background: var(--ok); color: var(--ok-ink); }
+.rest-bar { height: 4px; border-radius: 2px; background: rgba(0,0,0,.18); overflow: hidden; margin-top: 6px; }
+.rest-bar i { display: block; height: 100%; background: currentColor; transition: width .25s linear; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(70px + env(safe-area-inset-bottom, 0px)); z-index: 11; background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: calc(100% - 32px); }
+.toast.show { opacity: 1; }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.stat .v { font-family: var(--display); font-weight: 800; font-size: 28px; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-top: 4px; }
+
+.sess { cursor: pointer; }
+.sess .detail { border-top: 1px solid var(--line); padding-top: 10px; }
+.sess .detail .line { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 15px; }
+.sess .detail .line span:last-child { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+.notice { background: var(--surface-2); border-left: 3px solid var(--accent); padding: 10px 12px; border-radius: 8px; font-size: 14px; }
+.empty { text-align: center; padding: 28px 12px; color: var(--muted); display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.empty h2 { color: var(--fg); }
+.editor { border-top: 1px dashed var(--line); padding-top: 10px; }
+.dayhead { display: flex; align-items: center; gap: 10px; }
+.dayhead .dn { font-family: var(--display); font-weight: 800; font-size: 20px; text-transform: uppercase; min-width: 42px; }
+.dayhead input { font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) { .toast, .rest-bar i { transition: none; } }
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">Тренировъчен <span>дневник</span></div>
+    <div class="sync" id="sync"><i></i><span id="syncText">зарежда</span></div>
+  </div>
+</header>
+
+<main class="wrap" id="view"></main>
+
+<div class="rest" id="rest" hidden>
+  <div class="rest-inner" id="restInner">
+    <div class="grow" style="min-width:0">
+      <div class="lbl" id="restLbl">Почивка</div>
+      <div class="who" id="restWho"></div>
+      <div class="rest-bar"><i id="restFill" style="width:100%"></i></div>
+    </div>
+    <div class="t num" id="restTime">0:00</div>
+    <button class="btn sm" id="restPlus" type="button">+30с</button>
+    <button class="btn sm" id="restSkip" type="button">Готово</button>
+  </div>
+</div>
+
+<nav class="tabs">
+  <div class="tabs-inner">
+    <button class="tab" data-view="today" type="button">Днес</button>
+    <button class="tab" data-view="program" type="button">Програма</button>
+    <button class="tab" data-view="history" type="button">История</button>
+  </div>
+</nav>
+<div class="toast" id="toast"></div>
+<datalist id="exnames"></datalist>
+
+<script>
+(function () {
+  'use strict';
+  const DAYS = [
+    ['mon', 'Понеделник', 'Пн'], ['tue', 'Вторник', 'Вт'], ['wed', 'Сряда', 'Ср'],
+    ['thu', 'Четвъртък', 'Чт'], ['fri', 'Петък', 'Пт'], ['sat', 'Събота', 'Сб'], ['sun', 'Неделя', 'Нд']
+  ];
+  const DAY_NAME = Object.fromEntries(DAYS.map(d => [d[0], d[1]]));
+  const VIEWS = ['today', 'program', 'history'];
+
+  // ---------- state ----------
+  let program = null;      // {days:{mon:{title,exercises:[]}}, sample, updatedAt}
+  let sessions = [];       // newest first
+  let active = null;       // workout in progress (kept on this device)
+  let selectedDay = todayKey();
+  let view = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'today';
+  let loading = true, loadNote = '';
+  let editingEx = null, expandedSess = null, finishing = false, discardArmed = false;
+  let confirmReset = false, deleteArmed = null;
+  let db = null, usingDb = false, dirtyUntil = 0;
+
+  const LS = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+    set(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  };
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  function todayKey() { return DAYS[(new Date().getDay() + 6) % 7][0]; }
+  function dateStr(ts) { const d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function fmtDate(ts) { return new Date(ts).toLocaleDateString('bg-BG', { weekday: 'short', day: 'numeric', month: 'short' }); }
+  function fmtDur(sec) { sec = Math.max(0, Math.round(sec)); const m = Math.floor(sec / 60), s = sec % 60; return m + ':' + String(s).padStart(2, '0'); }
+  function fmtKg(n) { return (Math.round(n * 10) / 10).toLocaleString('bg-BG'); }
+  function num(v) { const n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? null : n; }
+  function firstNum(v) { const m = String(v == null ? '' : v).match(/\d+(?:[.,]\d+)?/); return m ? m[0].replace(',', '.') : ''; }
+  function norm(s) { return String(s || '').trim().toLowerCase(); }
+
+  function emptyProgram() {
+    const days = {};
+    DAYS.forEach(d => { days[d[0]] = { title: '', exercises: [] }; });
+    return { days, sample: false, updatedAt: Date.now() };
+  }
+  function normalizeProgram(d) {
+    const p = emptyProgram();
+    if (d && d.days) DAYS.forEach(x => {
+      const src = d.days[x[0]] || {};
+      p.days[x[0]] = {
+        title: String(src.title || ''),
+        exercises: Array.isArray(src.exercises) ? src.exercises.map(e => ({
+          id: e.id || uid(), name: String(e.name || ''), sets: Math.max(1, parseInt(e.sets, 10) || 3),
+          reps: String(e.reps == null ? '' : e.reps), weight: String(e.weight == null ? '' : e.weight),
+          rest: Math.max(0, parseInt(e.rest, 10) || 0), note: String(e.note || '')
+        })) : []
+      };
+    });
+    p.sample = !!(d && d.sample);
+    p.updatedAt = (d && d.updatedAt) || 0;
+    return p;
+  }
+  function sampleProgram() {
+    const ex = (name, sets, reps, weight, rest, note) => ({ id: uid(), name, sets, reps, weight, rest, note: note || '' });
+    const p = emptyProgram();
+    p.days.mon = { title: 'Гърди и трицепс', exercises: [
+      ex('Лежанка с щанга', 4, '8', '60', 120, 'Загрявка: 2 серии с празен лост'),
+      ex('Наклонена лежанка с дъмбели', 3, '10', '22', 90),
+      ex('Кръстосване на кабел', 3, '12-15', '15', 60),
+      ex('Трицепс на кабел с въже', 3, '12', '25', 60),
+      ex('Френска преса', 3, '10', '25', 60)
+    ] };
+    p.days.wed = { title: 'Гръб и бицепс', exercises: [
+      ex('Мъртва тяга', 4, '6', '100', 150),
+      ex('Набирания', 4, '8', 'тяло', 120, 'С ластик, ако не стигат'),
+      ex('Гребане с щанга', 3, '10', '60', 90),
+      ex('Долен скрипец', 3, '12', '50', 75),
+      ex('Бицепс сгъване с щанга', 3, '10', '30', 60),
+      ex('Чук сгъване с дъмбели', 3, '12', '14', 60)
+    ] };
+    p.days.fri = { title: 'Крака и рамене', exercises: [
+      ex('Клек с щанга', 4, '8', '80', 150),
+      ex('Румънска мъртва тяга', 3, '10', '60', 120),
+      ex('Лег преса', 3, '12', '120', 90),
+      ex('Раменна преса с дъмбели', 4, '8', '20', 90),
+      ex('Странично повдигане', 3, '15', '10', 60),
+      ex('Прасци на машина', 4, '15', '60', 60)
+    ] };
+    p.sample = true;
+    p.updatedAt = Date.now();
+    return p;
+  }
+
+  // ---------- storage ----------
+  function setSync(cls, text) { const el = $('#sync'); el.className = 'sync ' + cls; $('#syncText').textContent = text; }
+  async function boot() {
+    active = LS.get('gym.active');
+    render();
+    try { db = (window.claude && typeof window.claude.use === 'function') ? await window.claude.use('db') : null; } catch (e) { db = null; }
+    if (db) { usingDb = true; subscribeDb(); }
+    else {
+      program = normalizeProgram(LS.get('gym.program')) ;
+      if (!LS.get('gym.program')) program = emptyProgram();
+      sessions = LS.get('gym.sessions') || [];
+      loading = false; setSync('ok', 'на това устройство'); render();
+    }
+  }
+  function subscribeDb() {
+    setSync('busy', 'свързва');
+    let definitive = false;
+    const timer = setTimeout(() => { if (!definitive) { loadNote = 'Връзката със сървъра още не е потвърдена. Данните може да са стари.'; if (loading) { loading = false; if (!program) program = emptyProgram(); } setSync('err', 'без връзка'); render(); } }, 10000);
+    const settle = (snap) => { if (!snap.metadata.fromCache && !definitive) { definitive = true; clearTimeout(timer); loadNote = ''; setSync('ok', 'синхронизирано'); } };
+    db.doc('program/main').onSnapshot(s => {
+      settle(s);
+      if (s.metadata.hasPendingWrites || Date.now() < dirtyUntil) { if (loading) { loading = false; } return; }
+      const next = s.exists ? normalizeProgram(s.data()) : emptyProgram();
+      const changed = JSON.stringify(next) !== JSON.stringify(program);
+      if (changed) { program = next; LS.set('gym.program', program); }
+      if (loading || changed) { loading = false; render(); }
+    }, e => { clearTimeout(timer); loading = false; if (!program) program = emptyProgram(); loadNote = 'Грешка при зареждане: ' + e.code; setSync('err', 'грешка'); render(); });
+    db.collection('sessions').orderBy('startedAt', 'desc').limit(500).onSnapshot(s => {
+      settle(s);
+      const next = s.docs.map(d => d.data());
+      if (JSON.stringify(next) !== JSON.stringify(sessions)) { sessions = next; LS.set('gym.sessions', sessions); render(); }
+    }, e => { loadNote = 'Историята не може да се зареди: ' + e.code; render(); });
+  }
+  let saveTimer = null, saveChain = Promise.resolve();
+  function programChanged(rerender) {
+    program.updatedAt = Date.now(); program.sample = false;
+    dirtyUntil = Date.now() + 2500;
+    LS.set('gym.program', program);
+    clearTimeout(saveTimer); saveTimer = setTimeout(flushProgram, 700);
+    if (usingDb) setSync('busy', 'записва');
+    if (rerender) render();
+  }
+  function flushProgram() {
+    if (!usingDb) return;
+    const snap = JSON.parse(JSON.stringify(program));
+    saveChain = saveChain.then(() => db.doc('program/main').set(snap)).then(() => setSync('ok', 'синхронизирано')).catch(e => { setSync('err', 'грешка'); toast('Неуспешен запис: ' + (e && e.message || e)); });
+  }
+  function saveActive() { LS.set('gym.active', active); }
+  async function persistSession(sess) {
+    if (usingDb) {
+      try { await db.collection('sessions').doc(sess.id).set(sess); }
+      catch (e) { toast('Тренировката не се записа: ' + (e && e.message || e)); return false; }
+    } else { sessions.unshift(sess); LS.set('gym.sessions', sessions); }
+    return true;
+  }
+  async function removeSession(id) {
+    if (usingDb) { try { await db.collection('sessions').doc(id).delete(); } catch (e) { toast('Неуспешно изтриване'); return; } }
+    else { sessions = sessions.filter(s => s.id !== id); LS.set('gym.sessions', sessions); }
+    toast('Изтрито'); render();
+  }
+
+  // ---------- derived ----------
+  function lastSets(name) {
+    const n = norm(name); if (!n) return null;
+    for (const s of sessions) {
+      for (const e of (s.exercises || [])) {
+        if (norm(e.name) === n) { const done = (e.sets || []).filter(x => x.done); if (done.length) return { date: s.startedAt, sets: done }; }
+      }
+    }
+    return null;
+  }
+  function setsLabel(sets) { return sets.map(x => (x.w === '' || x.w == null ? '–' : x.w) + '×' + (x.r === '' || x.r == null ? '–' : x.r)).join(', '); }
+  function sessionVolume(s) { let v = 0; (s.exercises || []).forEach(e => (e.sets || []).forEach(x => { if (x.done) { const w = num(x.w), r = num(x.r); if (w != null && r != null) v += w * r; } })); return v; }
+  function sessionSets(s) { let c = 0; (s.exercises || []).forEach(e => (e.sets || []).forEach(x => { if (x.done) c++; })); return c; }
+  function weekStart(ts) { const d = new Date(ts); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }
+  function trainedThisWeek() { const ws = weekStart(Date.now()); const keys = new Set(); sessions.forEach(s => { if (s.startedAt >= ws) keys.add(s.dayKey); }); return keys; }
+  function allNames() { const set = new Set(); if (program) DAYS.forEach(d => program.days[d[0]].exercises.forEach(e => { if (e.name.trim()) set.add(e.name.trim()); })); sessions.forEach(s => (s.exercises || []).forEach(e => { if (e.name) set.add(e.name); })); return [...set].sort(); }
+
+  // ---------- render ----------
+  function render() {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+    const el = $('#view');
+    if (loading && !active) { el.innerHTML = '<div class="empty"><h2>Зареждане…</h2><div>Програмата и историята се изтеглят.</div></div>'; return; }
+    if (!program) program = emptyProgram();
+    let html = loadNote ? '<div class="notice">' + esc(loadNote) + '</div>' : '';
+    if (view === 'today') html += active ? renderWorkout() : renderToday();
+    else if (view === 'program') html += renderProgram();
+    else html += renderHistory();
+    el.innerHTML = html;
+    $('#exnames').innerHTML = allNames().map(n => '<option value="' + esc(n) + '"></option>').join('');
+  }
+
+  function renderToday() {
+    const tk = todayKey(), trained = trainedThisWeek();
+    const day = program.days[selectedDay];
+    const strip = '<div class="daystrip">' + DAYS.map(d => {
+      const has = program.days[d[0]].exercises.length > 0;
+      return '<button class="daychip' + (d[0] === tk ? ' today' : '') + (d[0] === selectedDay ? ' sel' : '') + (has ? ' has' : '') + (trained.has(d[0]) ? ' done' : '') + '" data-action="pick-day" data-day="' + d[0] + '" type="button"><span class="d">' + d[2] + '</span><span class="dot"></span></button>';
+    }).join('') + '</div>';
+    let h = '<div class="stack"><div class="eyebrow">' + esc(new Date().toLocaleDateString('bg-BG', { weekday: 'long', day: 'numeric', month: 'long' })) + '</div>' +
+      '<h1>' + esc(day.title || (day.exercises.length ? DAY_NAME[selectedDay] : 'Почивен ден')) + '</h1>' +
+      '<div class="muted small">' + esc(DAY_NAME[selectedDay]) + (selectedDay === tk ? ' · днес' : '') + ' · ' + day.exercises.length + ' упражнения · ' + day.exercises.reduce((a, e) => a + e.sets, 0) + ' серии</div>' + strip + '</div>';
+    if (program.sample) h += '<div class="notice">Това е примерна програма. Промени я от раздел <b>Програма</b>, за да е твоята.</div>';
+    if (!day.exercises.length) {
+      h += '<div class="card flat"><div class="empty"><h2>Няма упражнения за ' + esc(DAY_NAME[selectedDay].toLowerCase()) + '</h2><div>Избери друг ден отгоре или добави упражнения в програмата.</div><button class="btn" data-action="go" data-view="program" type="button">Към програмата</button></div></div>';
+      if (!DAYS.some(d => program.days[d[0]].exercises.length)) h += '<div class="card"><h3>Празна програма</h3><div class="muted small">Можеш да започнеш от примерна тридневна програма и да я промениш.</div><button class="btn" data-action="load-sample" type="button">Зареди примерна програма</button></div>';
+      return h;
+    }
+    h += '<button class="btn primary big" data-action="start" type="button">Започни тренировката</button>';
+    h += '<div class="exlist">' + day.exercises.map(e => {
+      const last = lastSets(e.name);
+      return '<div class="ex"><div class="name">' + esc(e.name || 'Без име') + '</div><div class="target"><b>' + e.sets + ' × ' + esc(e.reps || '?') + '</b>' + (e.weight ? ' · ' + esc(e.weight) + (num(e.weight) != null ? ' кг' : '') : '') + (e.rest ? ' · почивка ' + fmtDur(e.rest) : '') + '</div>' +
+        (last ? '<div class="last">Последно (' + esc(fmtDate(last.date)) + '): <b>' + esc(setsLabel(last.sets)) + '</b></div>' : '') +
+        (e.note ? '<div class="small muted">' + esc(e.note) + '</div>' : '') + '</div>';
+    }).join('') + '</div>';
+    return h;
+  }
+
+  function renderWorkout() {
+    const doneSets = active.exercises.reduce((a, e) => a + e.sets.filter(s => s.done).length, 0);
+    const totalSets = active.exercises.reduce((a, e) => a + e.sets.length, 0);
+    let h = '<div class="card"><div class="workhead"><div><div class="eyebrow">Тренировка · ' + esc(DAY_NAME[active.dayKey]) + '</div><h2>' + esc(active.title) + '</h2></div><div class="elapsed" id="elapsed">' + fmtDur((Date.now() - active.startedAt) / 1000) + '</div></div>' +
+      '<div class="row between"><span class="muted small num">' + doneSets + ' / ' + totalSets + ' серии</span><button class="btn ' + (finishing ? 'ghost' : 'ok') + ' sm" data-action="finish" type="button">' + (finishing ? 'Назад' : 'Приключи') + '</button></div>';
+    if (finishing) {
+      const vol = sessionVolume(active);
+      h += '<div class="editor stack"><div><b>Запази тренировката?</b></div><div class="small muted">' + doneSets + ' серии · ' + fmtKg(vol) + ' кг обем · ' + fmtDur((Date.now() - active.startedAt) / 1000) + ' мин</div>' +
+        '<div class="row"><button class="btn primary grow" data-action="save-workout" type="button">Запази</button>' +
+        (discardArmed ? '<button class="btn danger" data-action="discard" type="button">Да, изтрий без запис</button>' : '<button class="btn ghost" data-action="arm-discard" type="button">Откажи без запис</button>') + '</div></div>';
+    }
+    h += '</div>';
+    h += '<div class="exlist">' + active.exercises.map((e, ei) => {
+      const last = lastSets(e.name);
+      const allDone = e.sets.length && e.sets.every(s => s.done);
+      return '<div class="ex" id="wex-' + ei + '"><div class="row between"><div class="name">' + esc(e.name) + '</div>' + (allDone ? '<span class="pill ok">Готово</span>' : '') + '</div>' +
+        '<div class="target">Цел: <b>' + e.sets.length + ' × ' + esc(e.targetReps || '?') + '</b>' + (e.targetWeight ? ' · ' + esc(e.targetWeight) + (num(e.targetWeight) != null ? ' кг' : '') : '') + (e.rest ? ' · почивка ' + fmtDur(e.rest) : '') + '</div>' +
+        (last ? '<div class="last">Последно: <b>' + esc(setsLabel(last.sets)) + '</b></div>' : '') +
+        (e.note ? '<div class="small muted">' + esc(e.note) + '</div>' : '') +
+        '<div class="sets"><div class="sethead"><span>#</span><span>кг</span><span>повт.</span><span>готово</span></div>' +
+        e.sets.map((s, si) => '<div class="set' + (s.done ? ' done' : '') + '"><span class="idx">' + (si + 1) + '</span>' +
+          '<input id="w-' + ei + '-' + si + '" type="text" inputmode="decimal" value="' + esc(s.w) + '" data-set="w" data-ei="' + ei + '" data-si="' + si + '" aria-label="Тежест">' +
+          '<input id="r-' + ei + '-' + si + '" type="text" inputmode="numeric" value="' + esc(s.r) + '" data-set="r" data-ei="' + ei + '" data-si="' + si + '" aria-label="Повторения">' +
+          '<button class="chk" data-action="toggle-set" data-ei="' + ei + '" data-si="' + si + '" type="button" aria-label="Серията е готова">' + (s.done ? '✓' : '○') + '</button></div>').join('') +
+        '</div><div class="row"><button class="btn sm ghost" data-action="add-set" data-ei="' + ei + '" type="button">+ серия</button>' + (e.sets.length > 1 ? '<button class="btn sm ghost" data-action="rm-set" data-ei="' + ei + '" type="button">− серия</button>' : '') + '</div></div>';
+    }).join('') + '</div>';
+    h += '<div class="card flat"><div class="row"><input id="extra-name" type="text" list="exnames" placeholder="Допълнително упражнение" class="grow"><button class="btn" data-action="add-extra" type="button">Добави</button></div></div>';
+    return h;
+  }
+
+  function renderProgram() {
+    let h = '<div class="stack"><div class="eyebrow">Седмична програма</div><h1>Програма</h1><div class="muted small">Ден без упражнения е почивен. Промените се запазват автоматично.</div></div>';
+    if (program.sample) h += '<div class="notice">Примерна програма. Всяка промяна я прави твоя.</div>';
+    h += DAYS.map(d => {
+      const day = program.days[d[0]];
+      return '<div class="card"><div class="dayhead"><span class="dn">' + d[2] + '</span><input id="title-' + d[0] + '" type="text" value="' + esc(day.title) + '" placeholder="' + (day.exercises.length ? 'Име на тренировката' : 'Почивка') + '" data-day="' + d[0] + '" data-field="title"></div>' +
+        (day.exercises.length ? '<div class="exlist">' + day.exercises.map((e, i) => renderExRow(d[0], e, i, day.exercises.length)).join('') + '</div>' : '') +
+        '<div class="row"><button class="btn sm" data-action="add-ex" data-day="' + d[0] + '" type="button">+ Упражнение</button>' +
+        (day.exercises.length ? '<select id="copy-' + d[0] + '" class="grow" data-action="copy-day" data-day="' + d[0] + '" aria-label="Копирай в друг ден"><option value="">Копирай деня в…</option>' + DAYS.filter(x => x[0] !== d[0]).map(x => '<option value="' + x[0] + '">' + x[1] + '</option>').join('') + '</select>' : '') + '</div></div>';
+    }).join('');
+    h += '<div class="card flat"><div class="row between"><div class="small muted">Замяна на цялата програма с примерната.</div>' +
+      (confirmReset ? '<button class="btn danger sm" data-action="load-sample" type="button">Да, замени</button><button class="btn sm ghost" data-action="cancel-reset" type="button">Отказ</button>' : '<button class="btn sm ghost" data-action="arm-reset" type="button">Зареди примерна</button>') + '</div></div>';
+    return h;
+  }
+  function renderExRow(dk, e, i, n) {
+    const open = editingEx === e.id;
+    let h = '<div class="ex"><div class="row between"><div class="grow"><div class="name">' + esc(e.name || 'Ново упражнение') + '</div><div class="target"><b>' + e.sets + ' × ' + esc(e.reps || '?') + '</b>' + (e.weight ? ' · ' + esc(e.weight) + (num(e.weight) != null ? ' кг' : '') : '') + (e.rest ? ' · ' + fmtDur(e.rest) + ' почивка' : '') + '</div></div>' +
+      '<button class="btn sm ' + (open ? '' : 'ghost') + '" data-action="edit-ex" data-id="' + e.id + '" type="button">' + (open ? 'Готово' : 'Промени') + '</button></div>';
+    if (open) {
+      const f = (field, label, type, extra, cls) => '<label class="field ' + (cls || '') + '">' + label + '<input id="ex-' + e.id + '-' + field + '" type="' + type + '" value="' + esc(e[field]) + '" data-day="' + dk + '" data-id="' + e.id + '" data-field="' + field + '" ' + (extra || '') + '></label>';
+      h += '<div class="editor stack"><div class="fields">' +
+        f('name', 'Упражнение', 'text', 'list="exnames"', 'span4') +
+        f('sets', 'Серии', 'number', 'min="1" inputmode="numeric"') +
+        f('reps', 'Повторения', 'text', 'placeholder="8-10" inputmode="numeric"') +
+        f('weight', 'Тежест', 'text', 'placeholder="кг или тяло" inputmode="decimal"') +
+        f('rest', 'Почивка (сек)', 'number', 'min="0" step="15" inputmode="numeric"') +
+        '<label class="field span4">Бележка<textarea id="ex-' + e.id + '-note" data-day="' + dk + '" data-id="' + e.id + '" data-field="note" rows="2">' + esc(e.note) + '</textarea></label></div>' +
+        '<div class="row"><button class="btn sm icon" data-action="move-ex" data-day="' + dk + '" data-id="' + e.id + '" data-dir="-1" type="button" ' + (i === 0 ? 'disabled' : '') + ' aria-label="Нагоре">↑</button><button class="btn sm icon" data-action="move-ex" data-day="' + dk + '" data-id="' + e.id + '" data-dir="1" type="button" ' + (i === n - 1 ? 'disabled' : '') + ' aria-label="Надолу">↓</button><span class="grow"></span>' +
+        (deleteArmed === e.id ? '<button class="btn sm danger" data-action="del-ex" data-day="' + dk + '" data-id="' + e.id + '" type="button">Потвърди изтриване</button>' : '<button class="btn sm ghost" data-action="arm-del" data-id="' + e.id + '" type="button">Изтрий</button>') + '</div></div>';
+    }
+    return h + '</div>';
+  }
+
+  function renderHistory() {
+    const ws = weekStart(Date.now());
+    const week = sessions.filter(s => s.startedAt >= ws).length;
+    const vol = sessions.reduce((a, s) => a + sessionVolume(s), 0);
+    let h = '<div class="stack"><div class="eyebrow">Изминали тренировки</div><h1>История</h1></div>' +
+      '<div class="stats"><div class="stat"><div class="v">' + sessions.length + '</div><div class="k">общо</div></div><div class="stat"><div class="v">' + week + '</div><div class="k">тази седмица</div></div><div class="stat"><div class="v">' + (vol >= 1000 ? fmtKg(vol / 1000) + ' т' : fmtKg(vol)) + '</div><div class="k">вдигнат обем</div></div></div>';
+    if (!sessions.length) return h + '<div class="card flat"><div class="empty"><h2>Още няма записани тренировки</h2><div>Започни тренировка от раздел „Днес“ и я приключи, за да се появи тук.</div></div></div>';
+    h += sessions.map(s => {
+      const open = expandedSess === s.id;
+      return '<div class="card sess" data-action="toggle-sess" data-id="' + s.id + '"><div class="row between"><div class="grow"><div class="eyebrow">' + esc(fmtDate(s.startedAt)) + ' · ' + esc(DAY_NAME[s.dayKey] || '') + '</div><h3>' + esc(s.title) + '</h3></div><div class="small muted num" style="text-align:right">' + sessionSets(s) + ' серии<br>' + fmtKg(sessionVolume(s)) + ' кг · ' + fmtDur(s.durationSec || 0) + '</div></div>' +
+        (open ? '<div class="detail">' + (s.exercises || []).map(e => { const done = (e.sets || []).filter(x => x.done); return '<div class="line"><span>' + esc(e.name) + '</span><span>' + (done.length ? esc(setsLabel(done)) : 'пропуснато') + '</span></div>'; }).join('') +
+          '<div class="row" style="margin-top:8px">' + (deleteArmed === s.id ? '<button class="btn sm danger" data-action="del-sess" data-id="' + s.id + '" type="button">Потвърди изтриване</button>' : '<button class="btn sm ghost" data-action="arm-del" data-id="' + s.id + '" type="button">Изтрий записа</button>') + '</div></div>' : '') + '</div>';
+    }).join('');
+    return h;
+  }
+
+  // ---------- workout actions ----------
+  function startWorkout() {
+    const day = program.days[selectedDay];
+    active = { id: uid(), dayKey: selectedDay, title: day.title || DAY_NAME[selectedDay], startedAt: Date.now(), exercises: day.exercises.map(e => buildActiveEx(e)) };
+    finishing = false; discardArmed = false; saveActive(); render(); window.scrollTo(0, 0);
+  }
+  function buildActiveEx(e) {
+    const last = lastSets(e.name);
+    const sets = [];
+    for (let i = 0; i < (e.sets || 3); i++) {
+      const l = last && last.sets[i];
+      sets.push({ w: l ? l.w : (num(e.weight) != null ? e.weight : ''), r: l ? l.r : firstNum(e.reps), done: false });
+    }
+    return { exId: e.id, name: e.name, targetReps: e.reps, targetWeight: e.weight, rest: e.rest || 0, note: e.note || '', sets };
+  }
+  async function saveWorkout() {
+    const end = Date.now();
+    const sess = { id: active.id, dayKey: active.dayKey, title: active.title, date: dateStr(active.startedAt), startedAt: active.startedAt, finishedAt: end, durationSec: Math.round((end - active.startedAt) / 1000), exercises: active.exercises.map(e => ({ name: e.name, sets: e.sets.map(s => ({ w: String(s.w), r: String(s.r), done: !!s.done })) })) };
+    sess.volume = sessionVolume(sess); sess.doneSets = sessionSets(sess);
+    const ok = await persistSession(sess);
+    if (!ok) return;
+    active = null; finishing = false; discardArmed = false; saveActive(); stopRest();
+    toast('Тренировката е записана'); go('history');
+  }
+
+  // ---------- rest timer ----------
+  let rest = null, restTick = null;
+  function startRest(sec, who) {
+    if (!sec) return;
+    rest = { endAt: Date.now() + sec * 1000, total: sec, who, over: false };
+    $('#rest').hidden = false; $('#restWho').textContent = who; $('#restLbl').textContent = 'Почивка'; $('#restInner').classList.remove('over');
+    clearInterval(restTick); restTick = setInterval(tickRest, 250); tickRest();
+  }
+  function tickRest() {
+    if (!rest) return;
+    const left = Math.max(0, (rest.endAt - Date.now()) / 1000);
+    $('#restTime').textContent = fmtDur(Math.ceil(left));
+    $('#restFill').style.width = Math.max(0, Math.min(100, left / rest.total * 100)) + '%';
+    if (left <= 0 && !rest.over) { rest.over = true; $('#restLbl').textContent = 'Следваща серия'; $('#restInner').classList.add('over'); beep(); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} setTimeout(() => { if (rest && rest.over) stopRest(); }, 6000); }
+  }
+  function stopRest() { rest = null; clearInterval(restTick); $('#rest').hidden = true; }
+  function beep() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      const ctx = beep.ctx || (beep.ctx = new AC()); const t = ctx.currentTime;
+      [0, .22, .44].forEach(off => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 880; o.connect(g); g.connect(ctx.destination); g.gain.setValueAtTime(0.0001, t + off); g.gain.exponentialRampToValueAtTime(0.3, t + off + .02); g.gain.exponentialRampToValueAtTime(0.0001, t + off + .18); o.start(t + off); o.stop(t + off + .2); });
+    } catch (e) {}
+  }
+  $('#restPlus').addEventListener('click', () => { if (rest) { rest.endAt += 30000; rest.total += 30; rest.over = false; $('#restLbl').textContent = 'Почивка'; $('#restInner').classList.remove('over'); tickRest(); } });
+  $('#restSkip').addEventListener('click', stopRest);
+  setInterval(() => { const el = $('#elapsed'); if (el && active) el.textContent = fmtDur((Date.now() - active.startedAt) / 1000); }, 1000);
+
+  // ---------- toast / nav ----------
+  let toastTimer = null;
+  function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
+  function go(v) { if (location.hash !== '#' + v) location.hash = v; else { view = v; render(); } }
+  window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (VIEWS.includes(v)) { view = v; deleteArmed = null; confirmReset = false; render(); window.scrollTo(0, 0); } });
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => go(t.dataset.view)));
+
+  // ---------- events ----------
+  document.getElementById('view').addEventListener('click', (ev) => {
+    const btn = ev.target.closest('[data-action]'); if (!btn) return;
+    if (btn.tagName === 'SELECT') return;
+    const a = btn.dataset.action, d = btn.dataset;
+    if (a === 'pick-day') { selectedDay = d.day; render(); }
+    else if (a === 'go') go(d.view);
+    else if (a === 'start') startWorkout();
+    else if (a === 'load-sample') { program = sampleProgram(); confirmReset = false; programChanged(true); program.sample = true; LS.set('gym.program', program); toast('Примерната програма е заредена'); }
+    else if (a === 'arm-reset') { confirmReset = true; render(); }
+    else if (a === 'cancel-reset') { confirmReset = false; render(); }
+    else if (a === 'finish') { finishing = !finishing; discardArmed = false; render(); window.scrollTo(0, 0); }
+    else if (a === 'save-workout') saveWorkout();
+    else if (a === 'arm-discard') { discardArmed = true; render(); }
+    else if (a === 'discard') { active = null; finishing = false; discardArmed = false; saveActive(); stopRest(); toast('Тренировката е отказана'); render(); }
+    else if (a === 'toggle-set') {
+      const e = active.exercises[+d.ei], s = e.sets[+d.si]; s.done = !s.done; saveActive(); render();
+      if (s.done) startRest(e.rest, e.name); else stopRest();
+    }
+    else if (a === 'add-set') { const e = active.exercises[+d.ei]; const l = e.sets[e.sets.length - 1]; e.sets.push({ w: l ? l.w : '', r: l ? l.r : '', done: false }); saveActive(); render(); }
+    else if (a === 'rm-set') { const e = active.exercises[+d.ei]; if (e.sets.length > 1) e.sets.pop(); saveActive(); render(); }
+    else if (a === 'add-extra') { const inp = $('#extra-name'); const name = inp.value.trim(); if (!name) { inp.focus(); return; } active.exercises.push(buildActiveEx({ id: uid(), name, sets: 3, reps: '', weight: '', rest: 60, note: '' })); saveActive(); render(); }
+    else if (a === 'add-ex') { const e = { id: uid(), name: '', sets: 3, reps: '10', weight: '', rest: 90, note: '' }; program.days[d.day].exercises.push(e); editingEx = e.id; programChanged(true); const inp = $('#ex-' + e.id + '-name'); if (inp) inp.focus(); }
+    else if (a === 'edit-ex') { editingEx = editingEx === d.id ? null : d.id; deleteArmed = null; render(); }
+    else if (a === 'move-ex') { const arr = program.days[d.day].exercises; const i = arr.findIndex(x => x.id === d.id); const j = i + (+d.dir); if (i < 0 || j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; programChanged(true); }
+    else if (a === 'arm-del') { deleteArmed = d.id; render(); }
+    else if (a === 'del-ex') { const day = program.days[d.day]; day.exercises = day.exercises.filter(x => x.id !== d.id); deleteArmed = null; editingEx = null; programChanged(true); toast('Изтрито'); }
+    else if (a === 'toggle-sess') { if (ev.target.closest('button')) return; expandedSess = expandedSess === d.id ? null : d.id; deleteArmed = null; render(); }
+    else if (a === 'del-sess') removeSession(d.id);
+  });
+  document.getElementById('view').addEventListener('change', (ev) => {
+    const sel = ev.target.closest('select[data-action="copy-day"]'); if (!sel || !sel.value) return;
+    const from = program.days[sel.dataset.day], to = program.days[sel.value];
+    to.exercises = to.exercises.concat(from.exercises.map(e => Object.assign({}, e, { id: uid() })));
+    if (!to.title) to.title = from.title;
+    programChanged(true); toast('Копирано в ' + DAY_NAME[sel.value].toLowerCase());
+  });
+  document.getElementById('view').addEventListener('input', (ev) => {
+    const t = ev.target;
+    if (t.dataset.set && active) {
+      const e = active.exercises[+t.dataset.ei]; if (!e) return;
+      e.sets[+t.dataset.si][t.dataset.set] = t.value.trim(); saveActive(); return;
+    }
+    if (t.dataset.field && t.dataset.day) {
+      const day = program.days[t.dataset.day];
+      if (t.dataset.id) {
+        const e = day.exercises.find(x => x.id === t.dataset.id); if (!e) return;
+        const f = t.dataset.field;
+        if (f === 'sets') e.sets = Math.max(1, parseInt(t.value, 10) || 1);
+        else if (f === 'rest') e.rest = Math.max(0, parseInt(t.value, 10) || 0);
+        else e[f] = t.value;
+      } else if (t.dataset.field === 'title') day.title = t.value;
+      programChanged(false);
+    }
+  });
+  // Summary line of an open exercise editor refreshes when the field loses focus.
+  document.getElementById('view').addEventListener('focusout', (ev) => {
+    if (ev.target.dataset && ev.target.dataset.id && ev.target.dataset.field && view === 'program') {
+      setTimeout(() => { if (!document.activeElement || !document.activeElement.dataset || document.activeElement.dataset.id !== ev.target.dataset.id) render(); }, 150);
+    }
+  });
+
+  boot();
+})();
+</script>
