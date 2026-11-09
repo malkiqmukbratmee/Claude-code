@@ -10,7 +10,7 @@ plan.json:
   "photo_scale": 0.8,                 # като в CapCut: вписана в кадъра и после x0.8, белият фон се вижда
   "photos": [{"start": 0.0, "end": 2.9, "file": "a.jpg"}, ...],
   "cards":  [{"start": 30.1, "end": 31.6, "text": "2. Заглавие"} | {"start":..,"end":..,"file":"card.png"}],
-  "subscribe": [{"start": 61.2, "end": 66.0}],          # бутонът е без звук, над всичко
+  "subscribe": [{"start": 61.2, "end": 66.0}],          # бутонът е без звук, само на бял екран (снимките под него се махат)
   "subscribe_clip": "subscribe-keyed.mov",              # с алфа; или зеленият оригинал + "subscribe_green": true
 }
 Празното между снимките остава бял фон. Времената се закръглят към кадър (1/fps).
@@ -92,6 +92,24 @@ def main():
     if missing:
         sys.exit("Липсват снимки: " + ", ".join(missing[:10]))
 
+    # „Абонирай се“ стои само на бял екран: докато върви бутонът, снимките и картите се махат.
+    subs = [(fr(s["start"]), fr(s["end"])) for s in P.get("subscribe", [])]
+    clip = rel(P["subscribe_clip"]) if P.get("subscribe_clip") else None
+    if subs and (not clip or not clip.exists()):
+        sys.exit("Има места за „абонирай се“, но няма subscribe_clip (клипът с бутона).")
+    clip_len = duration(clip) if subs else 0.0
+    spans = [(a, a + min(b - a, clip_len - 1 / fps)) for a, b in subs]
+    for sa, sb in spans:
+        cut = []
+        for kind, a, b, what in items:
+            if b <= sa or a >= sb:
+                cut.append((kind, a, b, what)); continue
+            if a < sa:
+                cut.append((kind, a, sa, what))
+            if b > sb:
+                cut.append((kind, sb, b, what))
+        items = [i for i in cut if i[2] - i[1] > 0.5 / fps]
+
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
         white = td / "white.jpg"; Image.new("RGB", (W, H), "white").save(white, quality=95)
@@ -118,18 +136,13 @@ def main():
         (td / "list.txt").write_text("".join(lines) + last + "\n")  # concat иска последния кадър пак
 
         cmd = ["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(td / "list.txt"), "-i", str(voice)]
-        subs = [(fr(s["start"]), fr(s["end"])) for s in P.get("subscribe", [])]
         fc = f"[0:v]fps={fps},format=yuv420p,setsar=1[base]"
         cur = "base"
         if subs:
-            clip = rel(P["subscribe_clip"]) if P.get("subscribe_clip") else None
-            if not clip or not clip.exists():
-                sys.exit("Има места за „абонирай се“, но няма subscribe_clip (клипът с бутона).")
-            clip_len = duration(clip)
-            for k, (a, b) in enumerate(subs):
+            for k, (a, b) in enumerate(spans):
                 cmd += ["-i", str(clip)]
                 key = (f"chromakey={GREEN}:0.10:0.06,despill=type=green:mix=0.6," if P.get("subscribe_green") else "")
-                dur = min(b - a, clip_len - 1 / fps)
+                dur = b - a
                 fc += (f";[{k + 2}:v]{key}scale={W}:{H},fps={fps},trim=0:{dur:.6f},format=yuva420p,"
                        f"setpts=PTS-STARTPTS+{a:.6f}/TB[s{k}]"
                        f";[{cur}][s{k}]overlay=eof_action=pass:enable='between(t,{a:.6f},{a + dur:.6f})'[v{k}]")
