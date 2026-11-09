@@ -14,8 +14,9 @@
 plan.json: [{"channel": "<канал>", "file": "x.mp4", "title": "...", "description": "...", "tags": [...],
              "category": "17", "language": "bg", "privacy": "private",
              "notion_kacvane": "<суровият текст под Качване: в Notion>", "slot": "D+1 12:00" (само за шорт),
+             "notion_tumb": "<суровият текст под Тъмб: в Notion>" (задължително за дългото видео),
              "thumbnail": "t.jpg"}]
-ПРАВИЛО: часът се изчислява САМО от notion_kacvane (notion_when.py); готов publish_at не се приема. Без конкретна
+ЗАКОН: дългото видео се качва само с дата и час И тъмбнейл в Notion; шортовете само след него. Часът се изчислява САМО от notion_kacvane (notion_when.py); готов publish_at не се приема. Без конкретна
 дата и час нищо не се качва и не се насрочва: видеото се обработва, остава готово и чака, докато в Notion се появи
 дата и час. Качва се private с publishAt и YouTube го пуска сам. При изчерпана квота останалото е в <plan>.pending.json.
 """
@@ -141,7 +142,12 @@ def check(item, base):
     # Часът идва САМО от суровия текст под „Качване:“ в Notion (notion_kacvane); готов publish_at не се приема.
     # Шорт: "slot": "D+1 12:00" = денят от Notion + 1, в 12:00.
     sys.path.append(str(Path(__file__).resolve().parent))
-    from notion_when import parse as notion_parse, TZ
+    from notion_when import parse as notion_parse, thumb_ok, TZ
+    if not item.get("slot"):  # дългото видео: ЗАКОН, тъмбнейл в Notion и свален файл
+        if not thumb_ok(item.get("notion_tumb", "")):
+            errs.append("няма тъмбнейл под „Тъмб:“ в Notion: не качвам и не насрочвам, видеото чака")
+        elif not item.get("thumbnail") or not (base / item["thumbnail"]).exists():
+            errs.append("тъмбнейлът от Notion не е свален до видеото (поле thumbnail): не качвам")
     when = notion_parse(item.get("notion_kacvane", ""))
     if not when:
         errs.append("няма дата и час под „Качване:“ в Notion: не качвам и не насрочвам, видеото чака")
