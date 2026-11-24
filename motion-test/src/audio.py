@@ -9,7 +9,7 @@ import sys, json, subprocess, numpy as np
 voice = sys.argv[1]; tmap_out = sys.argv[2]
 SR = 48000
 SFX_PEAK_DB = -24.5      # loudest sfx peak in dBFS (user wants <= -23)
-MAX_GAP, KEEP_GAP = 0.15, 0.08
+MAX_GAP, KEEP_GAP = 0.25, 0.20
 SIL_DB = -38.0
 HOLD_END = 0.7
 
