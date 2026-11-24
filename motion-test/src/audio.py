@@ -8,13 +8,14 @@ def load(ss, dur):
 def fade(x, a=0.015, b=0.03):
     na, nb = int(a*SR), int(b*SR)
     x[:na] *= np.linspace(0, 1, na); x[-nb:] *= np.linspace(1, 0, nb); return x
-# voice cuts (original file times): A 10.95-20.65, B 24.20-29.85 (skips false start), C 35.55-39.00
+# voice cuts (original file times): A 10.95-20.65, B 24.05-29.80 (skips false start), C 35.38-39.00
 segs = [(0.0, fade(load(10.95, 9.70))), (9.62, fade(load(24.05, 5.75))), (15.62, fade(load(35.38, 3.62), b=0.06))]
 total = 20.0
 mix = np.zeros(int(total*SR), np.float32)
 for t, x in segs:
     i = int(t*SR); mix[i:i+len(x)] += x[:len(mix)-i]
 rng = np.random.default_rng(1)
+SFX_GAIN = 0.2  # ~-14 dB: quiet background sfx
 def env(n, att, dec):
     t = np.arange(n)/SR; return np.minimum(1, t/att) * np.exp(-t/dec)
 def lp(x, k):  # crude one-pole lowpass, k in (0,1)
@@ -45,7 +46,7 @@ def sfx(kind):
         return 0.05*x*am*np.sin(np.pi*t/d)
     return np.zeros(1)
 for kind, t in json.load(open(sfxjson)):
-    x = sfx(kind).astype(np.float32); i = int(t*SR)
+    x = (SFX_GAIN*sfx(kind)).astype(np.float32); i = int(t*SR)
     mix[i:i+len(x)] += x[:max(0, len(mix)-i)]
 mix *= 0.89/np.abs(mix).max()
 pcm = (np.clip(mix, -1, 1)*32767).astype('<i2').tobytes()
