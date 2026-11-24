@@ -6,6 +6,8 @@ const fs = require('fs'), path = require('path');
   fs.mkdirSync(out, { recursive: true });
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
+  const tm = path.join(path.dirname(path.resolve(html)), 'tmap.json');
+  if (fs.existsSync(tm)) await p.addInitScript(`window.TMAP=${fs.readFileSync(tm, 'utf8')}`);
   await p.goto('file://' + path.resolve(html));
   await p.evaluate(() => document.fonts.ready);
   await p.waitForTimeout(300);
