@@ -11,8 +11,8 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:#3d8b37}
 #cam{position:absolute;inset:0;transform-origin:50% 50%}
 .page{position:absolute;inset:0;overflow:hidden;
   background:
-    radial-gradient(ellipse at 50% 45%,rgba(255,255,220,.10) 0%,rgba(0,0,0,0) 60%),
-    repeating-linear-gradient(90deg,#3f8c38 0,#3f8c38 160px,#4a9a42 160px,#4a9a42 320px)}
+    radial-gradient(ellipse at 50% 45%,rgba(255,255,220,.12) 0%,rgba(0,0,0,0) 62%),
+    #44933d}
 .page .grain{position:absolute;inset:0;opacity:.9;mix-blend-mode:multiply}
 .page svg.pitch{position:absolute;inset:0}
 .el{position:absolute;transform-origin:50% 50%;opacity:0;will-change:transform}
@@ -46,11 +46,6 @@ svg.draw{position:absolute;inset:0;width:1920px;height:1080px;overflow:visible;p
 <!-- ============ PAGE 1: left half of the pitch ============ -->
 <div class="page" id="p1">
   <svg class="grain" width="1920" height="1080"><rect width="1920" height="1080" filter="url(#grainf)"/></svg>
-  <svg class="pitch" width="1920" height="1080"><g fill="none" stroke="rgba(255,255,255,.62)" stroke-width="7" filter="url(#chalkf)">
-    <path d="M 2000 50 L 60 50 L 60 1030 L 2000 1030"/><line x1="1917" y1="50" x2="1917" y2="1030"/>
-    <circle cx="1917" cy="540" r="190"/><rect x="60" y="250" width="300" height="580"/><rect x="60" y="410" width="110" height="260"/>
-    <path d="M 360 440 A 130 130 0 0 1 360 640"/><path d="M 60 80 A 30 30 0 0 0 90 50"/><path d="M 90 1030 A 30 30 0 0 0 60 1000"/></g>
-    <circle cx="260" cy="540" r="8" fill="rgba(255,255,255,.62)"/><circle cx="1917" cy="540" r="10" fill="rgba(255,255,255,.62)"/></svg>
 
   <div class="el" id="bigY" style="left:460px;top:300px;width:1000px;text-align:center;font-family:PF;font-weight:900;font-size:380px;line-height:1;color:var(--chalk);text-shadow:0 8px 0 rgba(0,0,0,.25),0 18px 40px rgba(0,0,0,.35)">2015</div>
   <div class="el date" id="date" style="left:110px;bottom:70px">ГОДИНА<b>2015</b></div>
@@ -78,11 +73,6 @@ svg.draw{position:absolute;inset:0;width:1920px;height:1080px;overflow:visible;p
 <!-- ============ PAGE 2: right half of the pitch ============ -->
 <div class="page" id="p2">
   <svg class="grain" width="1920" height="1080"><rect width="1920" height="1080" filter="url(#grainf)"/></svg>
-  <svg class="pitch" width="1920" height="1080"><g fill="none" stroke="rgba(255,255,255,.62)" stroke-width="7" filter="url(#chalkf)">
-    <path d="M -80 50 L 1860 50 L 1860 1030 L -80 1030"/><line x1="3" y1="50" x2="3" y2="1030"/>
-    <circle cx="3" cy="540" r="190"/><rect x="1560" y="250" width="300" height="580"/><rect x="1750" y="410" width="110" height="260"/>
-    <path d="M 1560 440 A 130 130 0 0 0 1560 640"/><path d="M 1860 80 A 30 30 0 0 1 1830 50"/><path d="M 1830 1030 A 30 30 0 0 1 1860 1000"/></g>
-    <circle cx="1660" cy="540" r="8" fill="rgba(255,255,255,.62)"/></svg>
 
   <div class="el card" id="man" style="left:190px;top:150px;width:470px;height:570px">
     <div id="sil" style="position:absolute;inset:16px;border-radius:4px;background:#d9d4ca;overflow:hidden">
