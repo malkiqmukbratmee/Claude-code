@@ -1,0 +1,204 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:PF;font-weight:900;src:url(fonts/pf900.ttf)}
+@font-face{font-family:PFI;font-style:italic;font-weight:800;src:url(fonts/pf800i.ttf)}
+@font-face{font-family:MR;font-weight:800;src:url(fonts/manrope800.ttf)}
+@font-face{font-family:OS;font-weight:700;src:url(fonts/oswald700.ttf)}
+:root{--ink:#2a2724;--label:#57524c;--red:#c8372d;--navy:#1d2f55;--blue:#2462c4;--paper:#f4efe4}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--paper)}
+#cam{position:absolute;inset:0;transform-origin:50% 50%}
+.page{position:absolute;inset:0;background:var(--paper);overflow:hidden}
+.page .lines{position:absolute;inset:0;
+  background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 43px,rgba(150,160,170,.38) 43px,rgba(150,160,170,.38) 45px);
+  background-position:0 22px}
+.page .margin{position:absolute;top:0;bottom:0;left:92px;width:2px;background:#e3a39b}
+.page .grain{position:absolute;inset:0;opacity:.5;mix-blend-mode:multiply}
+.el{position:absolute;transform-origin:50% 50%;opacity:0;will-change:transform}
+.card{background:#fdfcf8;border-radius:8px;box-shadow:0 2px 3px rgba(0,0,0,.10),0 10px 22px rgba(0,0,0,.16);padding:12px}
+.card img{display:block;width:100%;height:100%;object-fit:cover;border-radius:3px}
+.card.logo img{object-fit:contain}
+.tape{position:absolute;width:92px;height:30px;background:rgba(236,224,190,.78);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.label{font-family:MR;font-weight:800;font-size:23px;letter-spacing:.13em;color:var(--label);text-transform:uppercase;white-space:nowrap;text-align:center}
+.num{background:#fdfcf8;border:3px solid var(--ink);border-radius:5px;box-shadow:7px 7px 0 var(--ink);padding:6px 28px 10px;text-align:center}
+.num .v{font-family:PF;font-weight:900;font-size:78px;line-height:1;color:var(--navy)}
+.num .s{font-family:MR;font-weight:800;font-size:15px;letter-spacing:.14em;color:var(--label);margin-top:4px}
+.hl{font-family:PFI;font-style:italic;font-weight:800;font-size:38px;color:var(--ink);background:#f5d54a;padding:2px 14px 6px;white-space:nowrap}
+.stamp{font-family:OS;font-weight:700;font-size:92px;letter-spacing:.04em;color:var(--red);border:10px solid var(--red);border-radius:12px;padding:0 34px;line-height:1.15;mix-blend-mode:multiply;filter:url(#rough)}
+.date{font-family:MR;font-weight:800;font-size:15px;letter-spacing:.16em;color:#8a847c;border-bottom:2px solid #8a847c;padding-bottom:4px;white-space:nowrap}
+.date b{font-family:PFI;font-style:italic;font-weight:800;font-size:40px;letter-spacing:0;color:#3a3631;margin-left:10px}
+svg.draw{position:absolute;inset:0;width:1920px;height:1080px;overflow:visible;pointer-events:none}
+#vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(60,40,20,.16) 100%);pointer-events:none}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="5"/>
+    <feComponentTransfer><feFuncA type="discrete" tableValues="0 1 1 1 0.85 1"/></feComponentTransfer></filter>
+  <filter id="grainf"><feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" seed="7"/>
+    <feColorMatrix values="0 0 0 0 0.55  0 0 0 0 0.48  0 0 0 0 0.38  0 0 0 0.10 0"/></filter>
+</svg>
+
+<div id="cam">
+<!-- ============ PAGE 1 ============ -->
+<div class="page" id="p1">
+  <div class="lines"></div><div class="margin"></div>
+  <svg class="grain" width="1920" height="1080"><rect width="1920" height="1080" filter="url(#grainf)"/></svg>
+
+  <div class="el" id="bigY" style="left:610px;top:330px;width:700px;text-align:center;font-family:PF;font-weight:900;font-size:260px;line-height:1;color:var(--navy)">2015</div>
+  <div class="el date" id="date" style="right:120px;top:52px">ГОДИНА<b>2015</b></div>
+
+  <div class="el card logo" id="crest1" style="left:380px;top:250px;width:290px;height:310px"><img src="img/crest.png"></div>
+  <div class="el label" id="crest1L" style="left:325px;top:585px;width:400px">Локомотив Пловдив</div>
+  <div class="el hl" id="hard" style="left:395px;top:640px">труден период</div>
+
+  <div class="el card" id="fans" style="left:860px;top:205px;width:430px;height:268px"><img src="img/fans.jpg">
+    <div class="tape" style="left:-26px;top:-10px;transform:rotate(-32deg)"></div><div class="tape" style="right:-26px;top:-10px;transform:rotate(32deg)"></div></div>
+  <div class="el label" id="fansL" style="left:875px;top:492px;width:400px">Вярна публика</div>
+
+  <div class="el card" id="hist" style="left:1370px;top:215px;width:400px;height:258px"><img src="img/hist_c.jpg">
+    <div class="tape" style="left:150px;top:-16px;transform:rotate(-3deg)"></div></div>
+  <div class="el label" id="histL" style="left:1370px;top:492px;width:400px">Голяма история</div>
+  <div class="el num" id="year" style="left:1470px;top:548px;width:210px"><div class="v" id="yearV">1936</div><div class="s">ОСНОВАН</div></div>
+
+  <div class="el num" id="money" style="left:930px;top:735px;width:330px"><div class="v" style="color:var(--red)">€ ???</div><div class="s">ФИНАНСОВО БЪДЕЩЕ</div></div>
+  <div class="el stamp" id="stamp" style="left:1060px;top:790px">НЕСИГУРНО</div>
+
+  <svg class="draw"><path id="arr1" d="M 720 680 C 760 790, 820 820, 905 800" fill="none" stroke="#24211e" stroke-width="7" stroke-linecap="round"/>
+    <polygon id="arr1h" points="0,-13 26,0 0,13" fill="#24211e"/></svg>
+</div>
+
+<!-- ============ PAGE 2 ============ -->
+<div class="page" id="p2">
+  <div class="lines"></div><div class="margin"></div>
+  <svg class="grain" width="1920" height="1080"><rect width="1920" height="1080" filter="url(#grainf)"/></svg>
+<div style="position:absolute;inset:0;transform:translateY(75px)">
+  <div class="el card" id="man" style="left:420px;top:235px;width:340px;height:410px">
+    <div id="sil" style="position:absolute;inset:12px;border-radius:3px;background:#d9d4ca;overflow:hidden">
+      <svg viewBox="0 0 316 386" width="316" height="386"><circle cx="158" cy="150" r="70" fill="#4a4540"/>
+        <path d="M 30 386 C 30 270, 90 235, 158 235 C 226 235, 286 270, 286 386 Z" fill="#4a4540"/>
+        <text x="158" y="178" text-anchor="middle" font-family="PF" font-weight="900" font-size="96" fill="#f4efe4">?</text></svg></div>
+    <img id="krush" src="img/krush_c.jpg" style="position:absolute;inset:12px;width:316px;height:386px;opacity:0">
+    <div class="tape" style="left:124px;top:-16px;transform:rotate(2deg)"></div>
+  </div>
+  <div class="el label" id="manL" style="left:390px;top:668px;width:400px">Бизнесмен</div>
+
+  <div class="el" id="neq" style="left:905px;top:250px;font-family:PF;font-weight:900;font-size:230px;line-height:1;color:var(--red)">≠</div>
+
+  <div class="el card" id="typ" style="left:1190px;top:235px;width:440px;height:410px;padding:28px;text-align:center">
+    <svg width="384" height="150" viewBox="0 0 384 150">
+      <g transform="translate(120,75)"><circle r="62" fill="#fff" stroke="#24211e" stroke-width="5"/>
+        <polygon points="0,-24 23,-7 14,20 -14,20 -23,-7" fill="#24211e"/>
+        <path d="M0,-24 L0,-60 M23,-7 L57,-20 M14,20 L36,50 M-14,20 L-36,50 M-23,-7 L-57,-20" stroke="#24211e" stroke-width="5"/></g>
+      <g transform="translate(270,80)"><path d="M -48 60 C -70 60 -66 0 -30 -18 L -16 -36 L -30 -58 L 30 -58 L 16 -36 L 30 -18 C 66 0 70 60 48 60 Z" fill="#c9a548" stroke="#24211e" stroke-width="5" stroke-linejoin="round"/>
+        <text y="38" text-anchor="middle" font-family="PF" font-weight="900" font-size="56" fill="#24211e">€</text></g>
+    </svg>
+    <div style="font-family:PF;font-weight:900;font-size:46px;line-height:1.12;color:var(--navy);margin-top:14px">
+      <div class="el w" id="w1" style="position:relative">ТИПИЧЕН</div>
+      <div class="el w" id="w2" style="position:relative">ФУТБОЛЕН</div>
+      <div class="el w" id="w3" style="position:relative">ИНВЕСТИТОР</div></div>
+  </div>
+  <svg class="draw"><g id="xg">
+    <path id="x1" d="M 1215 260 L 1605 620" fill="none" stroke="#c8372d" stroke-width="14" stroke-linecap="round" opacity=".92"/>
+    <path id="x2" d="M 1605 260 L 1215 620" fill="none" stroke="#c8372d" stroke-width="14" stroke-linecap="round" opacity=".92"/></g></svg>
+
+  <svg class="draw"><path id="arr2" d="M 800 430 C 900 340, 1060 340, 1170 425" fill="none" stroke="#2462c4" stroke-width="8" stroke-linecap="round"/>
+    <polygon id="arr2h" points="0,-14 28,0 0,14" fill="#2462c4"/></svg>
+  <div class="el hl" id="fin" style="left:800px;top:470px;font-size:30px">финансовата издръжка</div>
+
+  <div class="el card logo" id="crest2" style="left:1230px;top:270px;width:290px;height:310px"><img src="img/crest.png"></div>
+  <div class="el label" id="crest2L" style="left:1175px;top:605px;width:400px">Локомотив Пловдив</div>
+  <div class="el hl" id="bw" style="left:1255px;top:660px">черно-белите!</div>
+</div>
+</div>
+</div>
+<div id="vig"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const cl=x=>Math.max(0,Math.min(1,x));
+const eOutBack=x=>{const c1=1.9,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)};
+const eOutCub=x=>1-Math.pow(1-x,3);
+const eInOut=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+
+// ---- timeline (seconds in final cut, synced to voice word timestamps) ----
+const POPS=[ // id, start, rotation(deg)
+ ['crest1',1.85,-2],['crest1L',2.05,0],
+ ['fans',5.15,2],['fansL',5.3,0],
+ ['hist',6.15,-2],['histL',6.3,0],['year',6.6,0],
+ ['money',7.55,0],
+ ['man',10.95,-1.5],['manL',11.1,0],
+ ['neq',12.35,0],['typ',13.3,1.5],['w1',13.4,0],['w2',13.96,0],['w3',14.6,0],
+ ['crest2',17.15,2],['crest2L',17.3,0],
+];
+const OUTS={neq:15.45,typ:15.45};          // scale-out times
+const HL={hard:3.3,fin:17.25,bw:18.4};    // marker reveals
+const SFX=[];                               // exported for audio mix
+POPS.forEach(p=>{ if(!/L$|^w/.test(p[0])) SFX.push(['pop',p[1]]); });
+['w1','w2','w3'].forEach(()=>0);
+SFX.push(['tick',13.4],['tick',13.96],['tick',14.6]);
+SFX.push(['swish',3.3],['swish',17.25],['swish',18.4]);
+SFX.push(['stamp',9.0],['whoosh',9.62],['scribble',14.85],['whoosh',15.45],['flip',15.75],['draw',7.7],['draw',16.85],['pop',0.3],['whoosh',1.3]);
+
+function pop(el,t,t0,rot){
+  const p=cl((t-t0)/0.38); if(t<t0){el.style.opacity=0;return}
+  const s=0.5+0.5*eOutBack(p);
+  el.style.opacity=cl((t-t0)/0.09);
+  el.style.transform=`scale(${s}) rotate(${rot}deg)`;
+}
+function drawPath(pid,hid,t,t0,d){
+  const p=$(pid),h=$(hid),L=p.getTotalLength(),k=eOutCub(cl((t-t0)/d));
+  p.style.strokeDasharray=L; p.style.strokeDashoffset=L*(1-k);
+  p.style.opacity=t<t0?0:1;
+  if(h){ if(k<=0.02){h.style.opacity=0;return}
+    const a=p.getPointAtLength(L*k),b=p.getPointAtLength(Math.max(0,L*k-6));
+    const ang=Math.atan2(a.y-b.y,a.x-b.x)*180/Math.PI;
+    h.setAttribute('transform',`translate(${a.x},${a.y}) rotate(${ang})`); h.style.opacity=1; }
+}
+function render(t){
+  // camera: gentle push per page + stamp shake
+  const page2=t>=9.62;
+  const base=page2?t-9.62:t;
+  let sc=1+0.025*cl(base/10);
+  let sx=0,sy=0; if(t>9.0&&t<9.25){const k=1-(t-9.0)/0.25;sx=Math.sin(t*170)*9*k;sy=Math.cos(t*130)*7*k;}
+  $('cam').style.transform=`translate(${sx}px,${sy}px) scale(${sc})`;
+  // page slide
+  const e=eInOut(cl((t-9.62)/0.42));
+  $('p1').style.transform=`translateX(${-1920*e}px)`;
+  $('p2').style.transform=`translateX(${1920*(1-e)}px)`;
+  // date tag
+  { const el=$('date'),p=eOutCub(cl((t-1.55)/0.35)); el.style.opacity=p; el.style.transform=`translateY(${(1-p)*-14}px)`; }
+  { const el=$('bigY'); if(t<0.3) el.style.opacity=0; else if(t<1.3){ pop(el,t,0.3,0); }
+    else { const p=eInOut(cl((t-1.3)/0.35)); el.style.opacity=1-p;
+      el.style.transform=`translate(${p*780}px,${p*-330}px) scale(${1-0.86*p})`; } }
+  POPS.forEach(([id,t0,r])=>pop($(id),t,t0,r));
+  // outs
+  for(const id in OUTS){ const t0=OUTS[id]; if(t>t0){const p=cl((t-t0)/0.25); const el=$(id); el.style.opacity=1-p; el.style.transform=`scale(${1-0.25*eInOut(p)})`;}}
+  // year counter
+  { const p=eOutCub(cl((t-6.6)/0.8)); $('yearV').textContent=Math.round(2015-(2015-1936)*p); }
+  // highlights
+  for(const id in HL){ const t0=HL[id],el=$(id),p=eOutCub(cl((t-t0)/0.45));
+    el.style.opacity=t<t0?0:1; el.style.transform='rotate(-1.5deg)'; el.style.clipPath=`inset(-10px ${100-100*p}% -10px -10px)`; }
+  // arrows
+  drawPath('arr1','arr1h',t,7.7,0.55);
+  drawPath('arr2','arr2h',t,16.85,0.55);
+  // stamp slam
+  { const el=$('stamp'),t0=9.0; if(t<t0) el.style.opacity=0; else { const p=cl((t-t0)/0.13);
+      el.style.opacity=0.2+0.75*p; el.style.transform=`rotate(-9deg) scale(${2.1-1.1*eOutCub(p)})`; } }
+  // red X scribble
+  { const k1=eOutCub(cl((t-14.85)/0.18)),k2=eOutCub(cl((t-15.02)/0.18));
+    [['x1',k1],['x2',k2]].forEach(([id,k])=>{const p=$(id),L=p.getTotalLength();p.style.strokeDasharray=L;p.style.strokeDashoffset=L*(1-k);p.style.opacity=k>0?.92:0;});
+    if(t>15.45){$('xg').style.opacity=1-cl((t-15.45)/0.25);} else $('xg').style.opacity=1; }
+  // reveal flip: silhouette -> Krusharski
+  { const m=$('man'); if(t>=15.75){ const p=cl((t-15.75)/0.32); const sxf=Math.abs(Math.cos(p*Math.PI));
+      m.style.transform=`scaleX(${Math.max(0.02,sxf)}) rotate(-1.5deg) scale(${1+0.06*Math.sin(p*Math.PI)})`;
+      const shown=p>=0.5; $('krush').style.opacity=shown?1:0; $('sil').style.opacity=shown?0:1; } }
+  // label typewriter swap
+  { const L=$('manL'); if(t>=15.9){ const s='Христо Крушарски',n=Math.round(s.length*cl((t-15.9)/0.4)); L.textContent=s.slice(0,n)||' '; L.style.color='#2a2724'; } else { L.textContent='Бизнесмен'; } }
+  // crest2 little bounce on "черно-белите"
+  if(t>18.4){ const p=cl((t-18.4)/0.35); $('crest2').style.transform=`scale(${1+0.07*Math.sin(p*Math.PI)}) rotate(2deg)`; }
+}
+window.render=render; window.SFX=SFX;
+</script>
+</body></html>
